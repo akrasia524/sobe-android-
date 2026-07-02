@@ -49,11 +49,25 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             };
 
             beatmap.MapColours.BindCollectionChanged((_, _) => rebuild(), true);
+            // A background can be dragged in while Song Setup is open, so react to it appearing/disappearing.
+            beatmap.HasBackground.BindValueChanged(_ => rebuild());
+        }
+
+        /// <summary>Extracts <paramref name="count"/> combo colours from the background image and applies them as the map palette.</summary>
+        private void applyAutoPalette(int count)
+        {
+            var palette = beatmap.ExtractBackgroundColours?.Invoke(count);
+            if (palette is { Count: > 0 })
+                beatmap.SetMapColours(palette);
         }
 
         private void rebuild()
         {
             flow.Clear();
+
+            // "Auto colours from background": a count picker (2-6) that fills the palette from the background image.
+            if (beatmap.HasBackground.Value && beatmap.ExtractBackgroundColours != null)
+                flow.Add(new AutoPaletteRow(applyAutoPalette));
 
             if (beatmap.MapColours.Count == 0)
             {
@@ -73,6 +87,94 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             flow.Add(new AddButton(() =>
                 beatmap.AddMapColour(add_defaults[beatmap.MapColours.Count % add_defaults.Length])));
+        }
+
+        /// <summary>"Auto colours from background" row: a label plus 2-6 count buttons that fill the palette from the image.</summary>
+        private partial class AutoPaletteRow : FillFlowContainer
+        {
+            private readonly System.Action<int> apply;
+
+            public AutoPaletteRow(System.Action<int> apply)
+            {
+                this.apply = apply;
+                RelativeSizeAxes = Axes.X;
+                AutoSizeAxes = Axes.Y;
+                Direction = FillDirection.Vertical;
+                Spacing = new Vector2(0, EditorTheme.Spacing.Xs);
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                var buttons = new FillFlowContainer
+                {
+                    AutoSizeAxes = Axes.Both,
+                    Direction = FillDirection.Horizontal,
+                    Spacing = new Vector2(EditorTheme.Spacing.Sm, 0),
+                };
+
+                for (int n = 2; n <= 6; n++)
+                {
+                    int count = n;
+                    buttons.Add(new CountButton(count, () => apply(count)));
+                }
+
+                Children = new Drawable[]
+                {
+                    new SpriteText
+                    {
+                        Text = "Auto colours from background",
+                        Colour = EditorTheme.Colours.TextMuted,
+                        Font = EditorTheme.Type.Body(),
+                    },
+                    buttons,
+                };
+            }
+        }
+
+        /// <summary>A small square number button (2-6) that requests that many auto-extracted colours.</summary>
+        private partial class CountButton : ClickableContainer
+        {
+            private readonly int count;
+            private Box background = null!;
+
+            public CountButton(int count, System.Action action)
+            {
+                this.count = count;
+                Action = action;
+                Size = new Vector2(EditorTheme.Sizing.InputHeight);
+                Masking = true;
+                CornerRadius = EditorTheme.Radius.Sm;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                Children = new Drawable[]
+                {
+                    background = new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Control },
+                    new SpriteText
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Text = count.ToString(),
+                        Colour = EditorTheme.Colours.Text,
+                        Font = EditorTheme.Type.BodyStrong(),
+                    },
+                };
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                background.FadeColour(EditorTheme.Colours.Accent, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.FadeColour(EditorTheme.Colours.Control, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
+                base.OnHoverLost(e);
+            }
         }
 
         /// <summary>One combo-colour row: index label, swatch (opens picker) and a remove button.</summary>

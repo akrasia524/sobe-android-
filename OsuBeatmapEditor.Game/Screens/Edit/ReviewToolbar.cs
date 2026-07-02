@@ -33,20 +33,22 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private readonly Bindable<string> authorName;
         private readonly Bindable<Colour4> authorColour;
         private readonly BindableBool showAlways;
+        private readonly BindableBool showAngles;
         private readonly string? lockedName;
 
         private Box swatch = null!;
 
         /// <summary>
-        /// The Review toolbar: author-name field, colour picker and a "show always" toggle. The lockedName
-        /// argument is the osu! account name when logged in (shown read-only); null means offline, so the name
-        /// stays editable.
+        /// The Review toolbar: author-name field, colour picker, a "show always" toggle and an "angles" toggle. The
+        /// lockedName argument is the osu! account name when logged in (shown read-only); null means offline, so the
+        /// name stays editable.
         /// </summary>
-        public ReviewToolbar(Bindable<string> authorName, Bindable<Colour4> authorColour, BindableBool showAlways, string? lockedName)
+        public ReviewToolbar(Bindable<string> authorName, Bindable<Colour4> authorColour, BindableBool showAlways, BindableBool showAngles, string? lockedName)
         {
             this.authorName = authorName;
             this.authorColour = authorColour;
             this.showAlways = showAlways;
+            this.showAngles = showAngles;
             this.lockedName = lockedName;
             AutoSizeAxes = Axes.Y;
             Width = WIDTH;
@@ -117,6 +119,30 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                         Anchor = Anchor.CentreLeft,
                                         Origin = Anchor.CentreLeft,
                                         Text = "Show always",
+                                        Colour = EditorTheme.Colours.TextMuted,
+                                        Font = EditorTheme.Type.Caption(),
+                                    },
+                                },
+                            },
+                            // Angles toggle row: overlays the opening angle between objects, coloured by sharpness.
+                            new FillFlowContainer
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                AutoSizeAxes = Axes.Y,
+                                Direction = FillDirection.Horizontal,
+                                Spacing = new Vector2(EditorTheme.Spacing.Xs, 0),
+                                Children = new Drawable[]
+                                {
+                                    new IconToggleButton(showAngles, FontAwesome.Solid.DraftingCompass, "Show the angle between objects (red = sharp, green = flowy)", 24)
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                    },
+                                    new SpriteText
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Text = "Angles",
                                         Colour = EditorTheme.Colours.TextMuted,
                                         Font = EditorTheme.Type.Caption(),
                                     },

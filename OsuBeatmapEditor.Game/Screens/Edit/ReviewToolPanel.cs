@@ -15,12 +15,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
     {
         Select,
         Note,
-        Draw,
     }
 
     /// <summary>
-    /// The Review-mode tool box on the left of the editor (mirrors <see cref="ToolPanel"/>): pick Select / Note /
-    /// Line, highlighting the active one. Shown only while Review mode is on (in place of the composing tools).
+    /// The Review-mode tool box on the left of the editor (mirrors <see cref="ToolPanel"/>): pick Select / Note,
+    /// highlighting the active one. Shown only while Review mode is on (in place of the composing tools).
     /// </summary>
     public partial class ReviewToolPanel : CompositeDrawable
     {
@@ -32,7 +31,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             (ReviewTool.Select, 1, "Select", FontAwesome.Solid.MousePointer),
             (ReviewTool.Note, 2, "Note", FontAwesome.Regular.StickyNote),
-            (ReviewTool.Draw, 3, "Draw", FontAwesome.Solid.PenNib),
         };
 
         public ReviewToolPanel()

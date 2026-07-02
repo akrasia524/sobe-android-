@@ -23,13 +23,24 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
     public partial class BackgroundToggleButton : CircularContainer, IHasTooltip
     {
         private readonly BindableFloat dim;
-        private readonly bool songAvailable;
+        private bool songAvailable;
 
         private CircularProgress dimRing = null!;
         private Box fill = null!;
         private SpriteText label = null!;
 
         public LocalisableString TooltipText => "Scroll to change background dim";
+
+        /// <summary>Whether there's a background to dim. Can be flipped on when an image is dragged in mid-session.</summary>
+        public bool SongAvailable
+        {
+            get => songAvailable;
+            set
+            {
+                songAvailable = value;
+                this.FadeTo(value ? 1f : 0f, 150, Easing.OutQuint);
+            }
+        }
 
         public BackgroundToggleButton(BindableFloat dim, bool songAvailable)
         {

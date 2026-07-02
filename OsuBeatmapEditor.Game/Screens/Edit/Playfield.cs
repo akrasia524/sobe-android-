@@ -65,6 +65,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private bool moving;
         private Vector2 moveStart;
 
+        // Review-mode "suggest a move": dragging objects in Review/Select previews a ghost at the new position and,
+        // on release, raises OnReviewCreateMoveSuggestion with the delta (the editor turns it into a shareable
+        // suggestion). It never touches the real objects.
+        private bool reviewMoving;
+        private Vector2 reviewMoveStart;
+        private Container? reviewMovePreview;
+
+        /// <summary>Raised when a Review/Select object drag finishes: the (dx, dy) osu!pixel move to suggest for the selection.</summary>
+        public Action<Vector2>? OnReviewCreateMoveSuggestion;
+
         // Rubber-band box-select state.
         private bool boxSelecting;
         private Vector2 boxStart;
@@ -81,19 +91,37 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private readonly Container playArea;
         private Container gridContainer = null!;
+        private Container playfieldBorder = null!;
         private readonly HitObjectLifetimeContainer followPointContainer;
         private readonly HitObjectLifetimeContainer hitObjectContainer;
+        private readonly HitObjectLifetimeContainer angleContainer;
         private readonly Container selectionLayer;
         private readonly Container overlayLayer;
         private readonly AnnotationLayer annotationLayer;
         private readonly Container annotationHighlightLayer;
+        private readonly Container modifiedHighlightLayer;
         // Persistent per-object highlight groups (so their alpha can be eased in sync with the note's fade rather
         // than rebuilt on/off); rebuilt only when the set of highlighted objects or their colours changes.
         private readonly Dictionary<int, Container> annotationHighlightGroups = new Dictionary<int, Container>();
         private string annotationHighlightSig = "";
 
-        /// <summary>When true, the playfield is in Review mode: object editing is suppressed and clicks drop notes.</summary>
-        public bool ReviewMode;
+        private bool reviewMode;
+
+        /// <summary>When true, the playfield is in Review mode: object editing is suppressed and clicks drop notes.
+        /// Also tints the snapping grid reddish so it's obvious you're reviewing.</summary>
+        public bool ReviewMode
+        {
+            get => reviewMode;
+            set
+            {
+                if (reviewMode == value)
+                    return;
+
+                reviewMode = value;
+                buildGrid(); // recolour the grid (reddish while reviewing)
+                playfieldBorder.BorderColour = value ? new Color4(0.82f, 0.31f, 0.36f, 1f) : OsuColour.TextMuted;
+            }
+        }
 
         /// <summary>The active Review tool (Select / Note / Line), driving what a playfield click does in Review mode.</summary>
         public ReviewTool ReviewTool;
@@ -101,15 +129,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Raised when a click in Review mode should create a note at the given osu!pixel position.</summary>
         public Action<Vector2>? OnReviewCreateNote;
 
-        /// <summary>Raised when a freehand Draw stroke is finished: the smoothed osu!pixel path.</summary>
-        public Action<IReadOnlyList<Vector2>>? OnReviewCreateStroke;
-
-        /// <summary>Supplies the modder's current colour, for the live draw preview.</summary>
+        /// <summary>Supplies the modder's current colour, for the suggestion ghost/arrow preview.</summary>
         public Func<Color4>? ReviewLineColour;
-
-        private bool drawingStroke;
-        private readonly List<Vector2> strokePoints = new List<Vector2>();
-        private SmoothPath? strokePreview;
 
         /// <summary>The modding-annotation overlay (notes), driven by the editor's Review layer.</summary>
         public AnnotationLayer Annotations => annotationLayer;
@@ -234,7 +255,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     },
                     // Snapping grid (toggled / resized with G), behind everything else.
                     gridContainer = new Container { RelativeSizeAxes = Axes.Both },
-                    new Container
+                    playfieldBorder = new Container
                     {
                         RelativeSizeAxes = Axes.Both,
                         Masking = true,
@@ -252,8 +273,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     hitObjectContainer = new HitObjectLifetimeContainer { RelativeSizeAxes = Axes.Both },
                     // Review-mode highlights: outlines (in the note author's colour) of the objects a shown note refers to.
                     annotationHighlightLayer = new Container { RelativeSizeAxes = Axes.Both },
+                    // Red outlines around objects changed by a suggestion (shown in the "Suggested changes" preview).
+                    modifiedHighlightLayer = new Container { RelativeSizeAxes = Axes.Both },
                     // Persistent yellow selection outlines (always visible, independent of object fade).
                     selectionLayer = new Container { RelativeSizeAxes = Axes.Both },
+                    // Review-mode angle indicators (opening angle between objects), above the objects. Lifetime-managed
+                    // like the objects/follow points so only on-screen angles are realised.
+                    angleContainer = new HitObjectLifetimeContainer { RelativeSizeAxes = Axes.Both },
                     // Placement preview + rubber-band box. The spacing-guide lines sit under the ghost circle.
                     overlayLayer = new Container
                     {
@@ -1085,21 +1111,26 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (e.Button != MouseButton.Left)
                 return false;
 
-            // Review mode: the Draw tool drags out a freehand stroke; other tools don't drag (notes drag themselves).
+            // Review mode: the Select tool drags objects to propose a move (a suggestion, not a real move); other
+            // tools don't drag (notes drag themselves).
             if (ReviewMode)
             {
-                if (ReviewTool == ReviewTool.Draw)
+                if (ReviewTool == ReviewTool.Select)
                 {
-                    strokePoints.Clear();
-                    strokePoints.Add(clampToPlayfield(playArea.ToLocalSpace(e.ScreenSpaceMouseDownPosition)));
-                    drawingStroke = true;
-                    overlayLayer.Add(strokePreview = new SmoothPath
+                    Vector2 reviewStart = playArea.ToLocalSpace(e.ScreenSpaceMouseDownPosition);
+                    var grabbed = hittableAt(reviewStart);
+                    if (grabbed != null)
                     {
-                        PathRadius = 1.6f,
-                        Colour = ReviewLineColour?.Invoke() ?? Color4.White,
-                    });
-                    return true;
+                        if (!selection.Contains(grabbed.Id))
+                            selection.SetSingle(grabbed.Id);
+
+                        reviewMoving = true;
+                        reviewMoveStart = reviewStart;
+                        updateReviewMovePreview(Vector2.Zero);
+                        return true;
+                    }
                 }
+
                 return false;
             }
 
@@ -1148,22 +1179,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             Vector2 pos = playArea.ToLocalSpace(e.ScreenSpaceMousePosition);
 
-            if (drawingStroke && strokePreview != null)
-            {
-                Vector2 p = clampToPlayfield(pos);
-                if (strokePoints.Count == 0 || (p - strokePoints[^1]).LengthSquared >= 4f)
-                    strokePoints.Add(p);
-                if (strokePoints.Count >= 2)
-                {
-                    strokePreview.Vertices = strokePoints.ToArray();
-                    strokePreview.Position = -strokePreview.PositionInBoundingBox(Vector2.Zero);
-                }
-                return;
-            }
-
             if (SliderPlacementActive)
                 return; // preview tracks the cursor in Update(); the anchor commits on release
-            if (moving)
+            if (reviewMoving)
+                updateReviewMovePreview(pos - reviewMoveStart);
+            else if (moving)
                 actions.MoveSelectionPosition(pos - moveStart);
             else if (boxSelecting)
                 updateBoxSelection(pos);
@@ -1171,22 +1191,20 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         protected override void OnDragEnd(DragEndEvent e)
         {
-            if (drawingStroke)
-            {
-                drawingStroke = false;
-                Vector2 end = clampToPlayfield(playArea.ToLocalSpace(e.ScreenSpaceMousePosition));
-                if (strokePoints.Count == 0 || (end - strokePoints[^1]).LengthSquared > 0.01f)
-                    strokePoints.Add(end);
-                strokePreview?.Expire();
-                strokePreview = null;
-
-                if (strokePoints.Count >= 2)
-                    OnReviewCreateStroke?.Invoke(StrokeSmoothing.Smooth(strokePoints));
-                strokePoints.Clear();
-            }
-            else if (SliderPlacementActive)
+            if (SliderPlacementActive)
             {
                 addSliderAnchor(playArea.ToLocalSpace(e.ScreenSpaceMousePosition));
+            }
+            else if (reviewMoving)
+            {
+                reviewMoving = false;
+                Vector2 delta = playArea.ToLocalSpace(e.ScreenSpaceMousePosition) - reviewMoveStart;
+                reviewMovePreview?.Expire();
+                reviewMovePreview = null;
+
+                // Ignore a tiny drag (a mis-click); otherwise raise the suggestion for the current selection.
+                if (delta.LengthSquared >= 9f)
+                    OnReviewCreateMoveSuggestion?.Invoke(delta);
             }
             else if (moving)
             {
@@ -1200,6 +1218,41 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 selectionBox = null;
             }
         }
+
+        /// <summary>Live ghost preview while dragging a Review "suggest move": hollow rings at the proposed head
+        /// positions of every selected object, plus arrows from their current positions, in the review colour.</summary>
+        private void updateReviewMovePreview(Vector2 delta)
+        {
+            reviewMovePreview?.Expire();
+            reviewMovePreview = new Container { RelativeSizeAxes = Axes.Both };
+            overlayLayer.Add(reviewMovePreview);
+
+            Color4 colour = ReviewLineColour?.Invoke() ?? Color4.White;
+
+            foreach (var o in currentHitObjects)
+            {
+                if (o.Kind == HitObjectKind.Spinner || !selection.Contains(o.Id))
+                    continue;
+
+                Vector2 head = startPosition(o) + DrawableHitObject.StackOffsetFor(o.StackHeight, currentDiameter);
+                Vector2 to = head + delta;
+                if (delta.LengthSquared >= 1f)
+                    reviewMovePreview.Add(guideLine(head, to, new Color4(colour.R, colour.G, colour.B, 0.6f), 2f));
+                reviewMovePreview.Add(suggestionRing(to, colour));
+            }
+        }
+
+        /// <summary>A hollow ring (object-sized) marking a suggested position, in the review colour.</summary>
+        private CircularContainer suggestionRing(Vector2 pos, Color4 colour) => new CircularContainer
+        {
+            Position = pos,
+            Origin = Anchor.Centre,
+            Size = new Vector2(currentDiameter),
+            Masking = true,
+            BorderThickness = currentDiameter * 0.09f,
+            BorderColour = colour,
+            Child = new Box { RelativeSizeAxes = Axes.Both, Colour = new Color4(colour.R, colour.G, colour.B, 0.12f) },
+        };
 
         /// <summary>Commits a slider anchor at the given (clamped) position, starting the trace on the first click.</summary>
         private void addSliderAnchor(Vector2 osuPosition)
@@ -1337,21 +1390,26 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Vertical lines, stepping out from the playfield centre in both directions.
             for (float x = centreX; x <= ParsedBeatmap.PLAYFIELD_WIDTH; x += size)
             {
-                gridContainer.Add(gridLine(x, vertical: true, centre: x == centreX));
+                gridContainer.Add(gridLine(x, vertical: true, centre: x == centreX, gridColour(x == centreX)));
                 if (x != centreX)
-                    gridContainer.Add(gridLine(centreX - (x - centreX), vertical: true, centre: false));
+                    gridContainer.Add(gridLine(centreX - (x - centreX), vertical: true, centre: false, gridColour(false)));
             }
 
             // Horizontal lines.
             for (float y = centreY; y <= ParsedBeatmap.PLAYFIELD_HEIGHT; y += size)
             {
-                gridContainer.Add(gridLine(y, vertical: false, centre: y == centreY));
+                gridContainer.Add(gridLine(y, vertical: false, centre: y == centreY, gridColour(y == centreY)));
                 if (y != centreY)
-                    gridContainer.Add(gridLine(centreY - (y - centreY), vertical: false, centre: false));
+                    gridContainer.Add(gridLine(centreY - (y - centreY), vertical: false, centre: false, gridColour(false)));
             }
         }
 
-        private static Drawable gridLine(float position, bool vertical, bool centre) => new Box
+        /// <summary>The grid-line colour: neutral white normally, reddish while in Review mode. Centre lines are stronger.</summary>
+        private Color4 gridColour(bool centre) => reviewMode
+            ? new Color4(1f, 0.36f, 0.33f, centre ? 0.36f : 0.18f)
+            : new Color4(1f, 1f, 1f, centre ? 0.22f : 0.1f);
+
+        private static Drawable gridLine(float position, bool vertical, bool centre, Color4 colour) => new Box
         {
             Anchor = Anchor.TopLeft,
             Origin = vertical ? Anchor.TopCentre : Anchor.CentreLeft,
@@ -1360,7 +1418,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             Height = vertical ? 1f : (centre ? 2f : 1f),
             X = vertical ? position : 0,
             Y = vertical ? 0 : position,
-            Colour = new Color4(1f, 1f, 1f, centre ? 0.22f : 0.1f),
+            Colour = colour,
         };
 
         /// <summary>Arms or disarms the circle-placement tool, clearing the selection when arming.</summary>
@@ -1541,6 +1599,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             buildFollowPoints(hitObjects);
+            if (ShowAngles)
+                buildAngles(hitObjects);
             updateSelection();
         }
 
@@ -1551,6 +1611,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             hitObjectContainer.ProcessCustomClock = false;
             followPointContainer.Clock = clock;
             followPointContainer.ProcessCustomClock = false;
+            angleContainer.Clock = clock;
+            angleContainer.ProcessCustomClock = false;
         }
 
         /// <summary>
@@ -1751,6 +1813,26 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 group.Alpha = highlights.TryGetValue(id, out var hl) ? hl.alpha : 0f;
         }
 
+        /// <summary>Draws a soft red selection ring around each object changed by a suggestion (the "Suggested changes" view).</summary>
+        public void SetModifiedHighlight(IReadOnlyCollection<int> ids)
+        {
+            modifiedHighlightLayer.Clear();
+            if (ids.Count == 0)
+                return;
+
+            var red = new Color4(1f, 0.36f, 0.36f, 1f);
+            foreach (var o in currentHitObjects)
+            {
+                if (!ids.Contains(o.Id) || o.Kind == HitObjectKind.Spinner)
+                    continue;
+
+                Vector2 stack = DrawableHitObject.StackOffsetFor(o.StackHeight, currentDiameter);
+                modifiedHighlightLayer.Add(selectionRing(startPosition(o) + stack, red));
+                if (o.Kind == HitObjectKind.Slider)
+                    modifiedHighlightLayer.Add(selectionRing(endPosition(o) + stack, red));
+            }
+        }
+
         /// <summary>
         /// Connects consecutive objects within the same combo (osu! draws no follow point across a new
         /// combo, nor to/from spinners) with a <see cref="DrawableFollowPoints"/> chain.
@@ -1893,6 +1975,65 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             var d = new DrawableFollowPoints(start, end, startTime, endTimeMs);
             followPointContainer.Add(d);
             previewFollowDrawables.Add(d);
+        }
+
+        /// <summary>When true, the Review-mode opening-angle indicators are drawn over the objects.</summary>
+        public bool ShowAngles { get; private set; }
+
+        // Angles across a gap larger than this (ms) are skipped - a break/section jump has no meaningful angle.
+        private const double angle_max_gap_ms = 2000;
+
+        /// <summary>Toggles the angle indicators, (re)building them for the current objects or clearing them.</summary>
+        public void SetShowAngles(bool on)
+        {
+            if (ShowAngles == on)
+                return;
+
+            ShowAngles = on;
+            if (on)
+                buildAngles(currentHitObjects);
+            else
+                angleContainer.Clear();
+        }
+
+        /// <summary>
+        /// Builds an angle indicator on each interior object: the opening angle between the path coming in from the
+        /// previous object (its exit → this head) and going out to the next (this exit → the next head), matching
+        /// how follow points treat slider heads/tails. Skips spinners and cross-break gaps.
+        /// </summary>
+        private void buildAngles(IReadOnlyList<HitObjectModel> hitObjects)
+        {
+            angleContainer.Clear();
+
+            for (int i = 1; i < hitObjects.Count - 1; i++)
+            {
+                var prev = hitObjects[i - 1];
+                var cur = hitObjects[i];
+                var next = hitObjects[i + 1];
+
+                if (prev.Kind == HitObjectKind.Spinner || cur.Kind == HitObjectKind.Spinner || next.Kind == HitObjectKind.Spinner)
+                    continue;
+
+                if (cur.StartTime - endTime(prev) > angle_max_gap_ms || next.StartTime - endTime(cur) > angle_max_gap_ms)
+                    continue;
+
+                Vector2 vertex = startPosition(cur);
+                Vector2 inbound = endPosition(prev) - vertex;               // back toward where the cursor came from
+                Vector2 outbound = startPosition(next) - endPosition(cur);  // onward toward the next object
+
+                if (inbound.LengthSquared < 1f || outbound.LengthSquared < 1f)
+                    continue; // stacked / coincident: no meaningful angle
+
+                Vector2 dirIn = Vector2.Normalize(inbound);
+                Vector2 dirOut = Vector2.Normalize(outbound);
+
+                float dot = Math.Clamp(Vector2.Dot(dirIn, dirOut), -1f, 1f);
+                float angleDeg = MathHelper.RadiansToDegrees(MathF.Acos(dot));
+
+                double lifeStart = cur.StartTime - lastPreempt;
+                double lifeEnd = endTime(cur) + settings.ObjectFadeOut.Value;
+                angleContainer.Add(new DrawableAngle(vertex, dirIn, dirOut, angleDeg, lifeStart, lifeEnd));
+            }
         }
 
         private static Vector2 startPosition(HitObjectModel o) =>

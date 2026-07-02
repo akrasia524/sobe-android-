@@ -46,6 +46,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // grows slightly into the space the timelines used to occupy, without going fully edge-to-edge.
         private const float hidden_bar_inset = 28f;
 
+        // Review mode (notes + suggestions) is disabled for now while the workflow is reworked. Flip to true to
+        // re-enable its button, the Ctrl+Shift+A shortcut and .sobemod import; the feature code is all still here.
+        private const bool review_enabled = false;
+
         // Width reserved on the right of the top timeline for the adjacent settings panel (beat divisor / BPM / SV).
         private const float timeline_side_width = 168f;
 
@@ -206,6 +210,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // Review mode: the editor-only, shareable modding-annotation layer (notes/lines, persisted per difficulty
         // and exportable as a .sobemod file). State + the in-memory document + its local store.
         private readonly BindableBool reviewMode = new BindableBool();
+
+        // Review-mode "angles" overlay: opening angle between objects, coloured by sharpness. Only shown in Review.
+        private readonly BindableBool showAngles = new BindableBool();
+
+        // Review mode is a live "track changes" view: the hit objects are always shown at their PROPOSED positions
+        // (real + every move suggestion) while the original is drawn as a faint ghost + arrow (the diff). TAB toggles
+        // that diff overlay on/off; the object positions don't change (they're proposed whenever reviewing). Purely
+        // visual - the stored map is untouched until a change is accepted.
+        private bool showDiff = true;
+        private readonly HashSet<int> previewModifiedIds = new HashSet<int>();
         private Annotations.AnnotationDocument reviewDoc = new Annotations.AnnotationDocument();
         private Annotations.AnnotationStore reviewStore = null!;
         private ReviewToolbar reviewToolbar = null!;
@@ -214,9 +228,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private Container patternPreviewBox = null!;
         private Container patternPreviewContent = null!;
         private FillFlowContainer reviewLeftPanel = null!;
+        private ReviewChangesPanel reviewChangesPanel = null!;
         private ReviewTool reviewTool = ReviewTool.Select;
-        // Default visible span of a freshly-drawn stroke (ms); the modder retimes it on the top timeline.
-        private const double default_stroke_duration_ms = 1000;
         // A note being created isn't added to the document until its text is committed, so creation is one atomic
         // (undoable) step and cancelling leaves nothing behind.
         private Annotations.Annotation? pendingNewNote;
@@ -241,6 +254,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // hit objects show; the playfield recentres and grows slightly. Toggled with Shift+Tab or the eye button.
         private bool hudHidden;
         private Container hudLayer = null!;
+        private ModePill modePill = null!;
         private SpriteText bpmText = null!;
         private SpriteText svText = null!;
         private SpriteText distanceSnapText = null!;
@@ -348,6 +362,19 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private Texture? backgroundTexture;
         private ScheduledDelegate? circleSizeRebuild;
 
+        // Background image state. currentBackgroundPath is the absolute path of the image currently shown (from the
+        // map's own store, or a dropped file), used by the "auto colours from background" extractor. When the user
+        // drags a new image in, pendingBackground* record it so the next save persists it into lazer's realm + .osu.
+        private string? currentBackgroundPath;
+        private string? pendingBackgroundPath;
+        private string? pendingBackgroundName;
+
+        // The live backdrop pieces, kept so a dropped image can be swapped in without rebuilding the tree.
+        private Container backgroundLayers = null!;
+        private Sprite backgroundSprite = null!;
+        private Box backgroundDim = null!;
+        private BackgroundToggleButton backgroundDimButton = null!;
+
         /// <summary>The playback position (ms) when the editor was last exited; used to resume the menu preview.</summary>
         public double LastTime { get; private set; }
 
@@ -391,6 +418,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             statistics?.EnterMap(statisticsKey);
             track = loadTrack(audio, host);
             backgroundTexture = loadBackgroundTexture(host);
+
+            // "Auto colours from background": lets the Song Setup colours editor pull a palette from the current
+            // background image. Reads currentBackgroundPath live so it uses a freshly dropped image too.
+            editable.HasBackground.Value = currentBackgroundPath != null;
+            editable.ExtractBackgroundColours = n => currentBackgroundPath != null
+                ? Graphics.ImagePaletteExtractor.Extract(currentBackgroundPath, n)
+                : new List<Colour4>();
 
             // Interpolate the audio clock: BASS only advances CurrentTime at the buffer rate, so reading
             // it raw each frame stair-steps the playfield. The interpolating clock fills the gaps smoothly.
@@ -447,6 +481,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
+                // Mode indicator pill (Review / Modding / suggested-map preview), top-left just below the timeline.
+                modePill = new ModePill
+                {
+                    Anchor = Anchor.TopLeft,
+                    Origin = Anchor.TopLeft,
+                    Margin = new MarginPadding { Left = 12, Top = top_bar_height + 8 },
+                },
                 // Authorship legend (who-placed-what colours); shown only while authorship mode is on.
                 authorLegend = new FillFlowContainer
                 {
@@ -564,7 +605,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             Size = new Vector2(30),
                         },
                         new IconToggleButton(moddingMode, FontAwesome.Solid.Comments, $"Modding mode ({Shortcut.CommandName}+Shift+M) - review the map's osu! discussions"),
-                        new IconToggleButton(reviewMode, FontAwesome.Regular.StickyNote, $"Review mode ({Shortcut.CommandName}+Shift+A) - draw notes/annotations only visible in this editor, shareable as a .sobemod file"),
+                        review_enabled
+                            ? new IconToggleButton(reviewMode, FontAwesome.Regular.StickyNote, $"Review mode ({Shortcut.CommandName}+Shift+A) - notes/suggestions only visible in this editor, shareable as a .sobemod file")
+                            : Empty(),
                     },
                 },
                 bottomTimeline = new EditorTimeline(track, parsed, () => VisualTime, rightInset: PlaybackControl.WIDTH) { Anchor = Anchor.BottomLeft, Origin = Anchor.BottomLeft },
@@ -573,7 +616,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Anchor = Anchor.BottomRight,
                     Origin = Anchor.BottomRight,
                 },
-                new BackgroundToggleButton(settings.BackgroundDim, backgroundTexture != null)
+                backgroundDimButton = new BackgroundToggleButton(settings.BackgroundDim, backgroundTexture != null)
                 {
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
@@ -733,10 +776,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Children = new Drawable[]
                     {
                         reviewToolPanel = new ReviewToolPanel { ToolSelected = applyReviewTool },
-                        reviewToolbar = new ReviewToolbar(settings.ReviewAuthorName, settings.ReviewAuthorColour, settings.ReviewShowAlways, loggedInModderName())
+                        reviewToolbar = new ReviewToolbar(settings.ReviewAuthorName, settings.ReviewAuthorColour, settings.ReviewShowAlways, showAngles, loggedInModderName())
                         {
                             OnExport = exportReviewLayer,
                             OnImport = importReviewLayerPrompt,
+                        },
+                        reviewChangesPanel = new ReviewChangesPanel
+                        {
+                            OnAccept = acceptSuggestion,
+                            OnReject = discardSuggestion,
+                            OnJump = a => seekTo(a.Time),
+                            OnAcceptAll = acceptAllSuggestions,
+                            OnRejectAll = rejectAllSuggestions,
                         },
                     },
                 },
@@ -988,12 +1039,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             };
 
             playfield.OnReviewCreateNote = createNoteAt;
-            playfield.OnReviewCreateStroke = createReviewStroke;
+            playfield.OnReviewCreateMoveSuggestion = applyMoveSuggestion;
             playfield.ReviewLineColour = () => toColor4(settings.ReviewAuthorColour.Value);
+            playfield.Annotations.ObjectHeadResolver = resolveObjectHead;
             playfield.Annotations.NoteActivated = a => noteEditPopover.OpenFor(a, isNew: false);
             playfield.Annotations.NoteMoveStart = pushUndo;
             playfield.Annotations.NoteMoved = _ => editable.IsDirty.Value = true;
-            playfield.Annotations.LineClicked = onLineClicked;
             playfield.Annotations.OnTimestampActivated = onTimestampActivated;
             playfield.Annotations.OnTextTimestampActivated = onTextTimestampActivated;
             playfield.Annotations.OnTextTimestampHover = showPatternPreview;
@@ -1002,6 +1053,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             refreshAnnotations();
 
             reviewMode.BindValueChanged(v => onReviewModeChanged(v.NewValue));
+            // The angles overlay only applies while reviewing; toggling it re-builds/clears on the playfield.
+            showAngles.BindValueChanged(v => { if (reviewMode.Value) playfield.SetShowAngles(v.NewValue); });
             // The "show always" toggle keeps notes visible on the playfield when not reviewing.
             settings.ReviewShowAlways.BindValueChanged(_ => applyAnnotationVisibility(), true);
 
@@ -1026,7 +1079,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 }
             });
 
-            // Dropping a .sobemod file onto the editor window imports/merges it.
+            // Dropping onto the editor window: a .sobemod imports/merges the Review layer; an image becomes the map background.
             if (host.Window != null)
             {
                 reviewDragDropHandler = path => Schedule(() => onReviewFileDropped(path));
@@ -1061,54 +1114,51 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Pushes the document's annotations to the playfield layer and the bottom-timeline markers.</summary>
         private void refreshAnnotations()
         {
-            playfield.Annotations.SetAnnotations(reviewDoc.Annotations);
+            playfield.Annotations.ObjectDiameter = circleDiameter(); // size suggestion ghosts to the current CS
+            // The move-suggestion diff (ghost + arrow) shows only while reviewing with the diff overlay on; otherwise
+            // just the notes render (TAB off = clean proposed map; outside Review = the real map).
+            bool showDiffOverlay = reviewMode.Value && showDiff;
+            var toRender = showDiffOverlay
+                ? reviewDoc.Annotations
+                : reviewDoc.Annotations.Where(a => a.Kind != Annotations.Annotation.KindMove).ToList();
+            playfield.Annotations.SetAnnotations(toRender);
 
             var markers = new System.Collections.Generic.List<(double, Colour4, osu.Framework.Graphics.Sprites.IconUsage)>();
-            var ranges = new System.Collections.Generic.List<(string, double, double, Colour4)>();
+            var changes = new System.Collections.Generic.List<(Annotations.Annotation, string)>();
             foreach (var a in reviewDoc.Annotations)
             {
-                Colour4 colour;
-                try { colour = Colour4.FromHex(a.Color); } catch { colour = EditorTheme.Colours.Accent; }
-
                 if (a.Kind == Annotations.Annotation.KindNote)
                 {
+                    Colour4 colour;
+                    try { colour = Colour4.FromHex(a.Color); } catch { colour = EditorTheme.Colours.Accent; }
                     markers.Add((a.Time, colour, ReviewIcons.For(a.Type)));
                 }
-                else // shape / stroke (freehand Draw)
+                else if (a.Kind == Annotations.Annotation.KindMove)
                 {
-                    markers.Add((a.Time, colour, osu.Framework.Graphics.Sprites.FontAwesome.Solid.PenNib));
-                    // Only show the (interactive) time-range bars while reviewing, so they don't clutter editing.
-                    if (reviewMode.Value)
-                        ranges.Add((a.Id, a.Time, a.EndTime ?? a.Time + default_stroke_duration_ms, colour));
+                    changes.Add((a, moveSuggestionLabel(a)));
                 }
             }
             bottomTimeline.SetAnnotationMarkers(markers, SeekTo);
-            topTimeline.SetStrokeRanges(ranges, onStrokeRangeBegin, onStrokeRangeChanged, onStrokeRangeCommit, onStrokeRangeDelete);
+            reviewChangesPanel.SetChanges(changes);
         }
 
-        /// <summary>Right-clicking a stroke's range bar on the top timeline removes the stroke.</summary>
-        private void onStrokeRangeDelete(string id)
+        /// <summary>A short label for a move suggestion row: the objects' combo numbers (or a count) at its time.</summary>
+        private string moveSuggestionLabel(Annotations.Annotation a)
         {
-            var a = reviewDoc.Annotations.Find(x => x.Id == id);
-            if (a != null)
-                onLineClicked(a);
+            int n = a.Objects?.Count ?? 0;
+            if (a.Objects is { Count: > 0 } ids)
+            {
+                var combos = ids
+                    .Select(id => parsed.HitObjects.FirstOrDefault(o => o.Id == id))
+                    .Where(o => o.Id >= 0)
+                    .OrderBy(o => o.StartTime)
+                    .Select(o => o.ComboNumber)
+                    .ToList();
+                if (combos.Count > 0 && combos.Count <= 4)
+                    return $"Move ({string.Join(",", combos)})";
+            }
+            return n == 1 ? "Move 1 object" : $"Move {n} objects";
         }
-
-        private void onStrokeRangeBegin() => pushUndo();
-
-        /// <summary>Live update while dragging a stroke's range bar on the top timeline (no rebuild, so the drag stays smooth).</summary>
-        private void onStrokeRangeChanged(string id, double start, double end)
-        {
-            var a = reviewDoc.Annotations.Find(x => x.Id == id);
-            if (a == null)
-                return;
-            a.Time = Math.Round(Math.Max(0, start));
-            a.EndTime = Math.Round(Math.Max(a.Time + 50, end));
-            editable.IsDirty.Value = true;
-        }
-
-        /// <summary>Commits a stroke-range drag: resync the markers/bars from the model.</summary>
-        private void onStrokeRangeCommit() => refreshAnnotations();
 
         private void onReviewModeChanged(bool on)
         {
@@ -1127,8 +1177,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             rateModButton.SetEnabled(!on);
 
             playfield.ReviewMode = on;
+            playfield.SetShowAngles(on && showAngles.Value); // the angles overlay is scoped to Review mode
+
+            // Review renders the objects at their PROPOSED positions (suggestions applied); leaving returns to the
+            // real map. The diff overlay starts on each time you enter.
+            if (!on)
+                showDiff = true;
+            rebuildHitObjects();
+
             if (on)
                 applyReviewTool(reviewTool); // re-assert the active review tool on entry
+
+            updateModePill();
             // The object selection is shared between normal and Review mode (so a Select-then-review flow keeps it).
             reviewLeftPanel.FadeTo(on ? 1 : 0, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
             bottomTimeline.SetReviewMode(on);
@@ -1176,6 +1236,163 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             pendingNewNote = note;
             selection.Clear();
             noteEditPopover.OpenFor(note, isNew: true);
+        }
+
+        /// <summary>
+        /// Records a drag on the current selection as a shareable "move" suggestion. Each object ends up in at most
+        /// one suggestion: any prior suggestion on these objects is folded in, so dragging them again (including in
+        /// the Suggested-changes preview, where they render at their proposed spot) accumulates instead of stacking.
+        /// </summary>
+        private void applyMoveSuggestion(Vector2 dragDelta)
+        {
+            if (selection.Selected.Count == 0)
+                return;
+
+            var ids = new System.Collections.Generic.List<int>(selection.Selected);
+            var idset = new HashSet<int>(ids);
+
+            // The objects render at their proposed spot in Review, so the drag adds to their existing suggested delta.
+            var applied = currentAppliedDelta(ids[0]);
+            Vector2 total = new Vector2(applied.dx, applied.dy) + dragDelta;
+
+            pushUndo();
+
+            // Detach these ids from every existing move suggestion (drop any that end up empty).
+            for (int i = reviewDoc.Annotations.Count - 1; i >= 0; i--)
+            {
+                var a = reviewDoc.Annotations[i];
+                if (a.Kind != Annotations.Annotation.KindMove || a.Objects == null)
+                    continue;
+                a.Objects.RemoveAll(id => idset.Contains(id));
+                if (a.Objects.Count == 0)
+                    reviewDoc.Annotations.RemoveAt(i);
+            }
+
+            // Store the net move (unless it cancels out to nothing).
+            if (total.LengthSquared >= 1f)
+            {
+                double time = parsed.HitObjects.Where(o => idset.Contains(o.Id)).Select(o => o.StartTime)
+                    .DefaultIfEmpty(CurrentTime).Min();
+
+                reviewDoc.Annotations.Add(new Annotations.Annotation
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Kind = Annotations.Annotation.KindMove,
+                    Time = Math.Round(time),
+                    Author = reviewAuthorName(),
+                    Color = settings.ReviewAuthorColour.Value.ToHex(),
+                    Objects = ids,
+                    DX = total.X,
+                    DY = total.Y,
+                    WindowMs = 4000,
+                });
+            }
+
+            refreshAnnotations();
+            rebuildHitObjects(); // move the objects to their new proposed spot (and refresh the diff overlay)
+            editable.IsDirty.Value = true; // selection kept so the mapper can keep nudging the same objects
+        }
+
+        /// <summary>The move delta currently applied to an object by suggestions (0 if none); last suggestion wins, matching the preview.</summary>
+        private (int dx, int dy) currentAppliedDelta(int id)
+        {
+            (int dx, int dy) applied = (0, 0);
+            foreach (var a in reviewDoc.Annotations)
+            {
+                if (a.Kind == Annotations.Annotation.KindMove && a.Objects != null && a.Objects.Contains(id)
+                    && a.DX is float dx && a.DY is float dy)
+                    applied = ((int)Math.Round(dx), (int)Math.Round(dy));
+            }
+            return applied;
+        }
+
+        /// <summary>The current head position (osu!pixels, incl. stacking) of an object by id, for drawing a suggestion ghost.</summary>
+        private Vector2? resolveObjectHead(int id)
+        {
+            int idx = parsed.HitObjects.FindIndex(o => o.Id == id);
+            if (idx < 0)
+                return null;
+
+            var o = parsed.HitObjects[idx];
+            Vector2 head = o.Path is { Count: > 0 } p ? p[0] : new Vector2(o.X, o.Y);
+            return head + DrawableHitObject.StackOffsetFor(o.StackHeight, circleDiameter());
+        }
+
+        /// <summary>Accepts a move suggestion: shifts its objects by the suggested delta (one undo step) and removes it.</summary>
+        private void acceptSuggestion(Annotations.Annotation a)
+        {
+            pushUndo();
+            applyMoveToMap(a);
+            reviewDoc.Annotations.Remove(a);
+            afterEdit();
+            refreshAnnotations();
+        }
+
+        /// <summary>Accepts every move suggestion at once (one undo step).</summary>
+        private void acceptAllSuggestions()
+        {
+            var moves = reviewDoc.Annotations.Where(a => a.Kind == Annotations.Annotation.KindMove).ToList();
+            if (moves.Count == 0)
+                return;
+
+            pushUndo();
+            foreach (var a in moves)
+            {
+                applyMoveToMap(a);
+                reviewDoc.Annotations.Remove(a);
+            }
+            afterEdit();
+            refreshAnnotations();
+        }
+
+        /// <summary>Shifts a suggestion's objects by its delta in the map model (no undo/rebuild - the caller batches those).</summary>
+        private void applyMoveToMap(Annotations.Annotation a)
+        {
+            if (a.Objects is not { Count: > 0 } ids || a.DX is not float dxf || a.DY is not float dyf)
+                return;
+
+            int dx = (int)Math.Round(dxf);
+            int dy = (int)Math.Round(dyf);
+            var idset = new HashSet<int>(ids);
+
+            for (int i = 0; i < parsed.HitObjects.Count; i++)
+            {
+                var o = parsed.HitObjects[i];
+                if (!idset.Contains(o.Id) || o.Kind == HitObjectKind.Spinner)
+                    continue;
+
+                parsed.HitObjects[i] = o with
+                {
+                    X = o.X + dx,
+                    Y = o.Y + dy,
+                    Path = offsetPath(o.Path, dx, dy),
+                    ControlPoints = offsetControlPoints(o.ControlPoints, dx, dy),
+                    RawLine = HitObjectLineEditor.ShiftPosition(o.RawLine, dx, dy),
+                };
+            }
+        }
+
+        /// <summary>Discards a move suggestion without touching the map.</summary>
+        private void discardSuggestion(Annotations.Annotation a)
+        {
+            pushUndo();
+            reviewDoc.Annotations.Remove(a);
+            refreshAnnotations();
+            rebuildHitObjects(); // the object returns to its real spot in the diff view
+            editable.IsDirty.Value = true;
+        }
+
+        /// <summary>Rejects every move suggestion at once (one undo step).</summary>
+        private void rejectAllSuggestions()
+        {
+            if (!reviewDoc.Annotations.Any(a => a.Kind == Annotations.Annotation.KindMove))
+                return;
+
+            pushUndo();
+            reviewDoc.Annotations.RemoveAll(a => a.Kind == Annotations.Annotation.KindMove);
+            refreshAnnotations();
+            rebuildHitObjects();
+            editable.IsDirty.Value = true;
         }
 
         /// <summary>The logged-in osu! username, or null when offline (so the modder identity can be edited).</summary>
@@ -1241,43 +1458,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             reviewDoc.Annotations.RemoveAll(a => a.Id == note.Id);
             refreshAnnotations();
             editable.IsDirty.Value = true;
-        }
-
-        /// <summary>Creates a static freehand stroke from a Draw-tool gesture, visible across a time range you can tune on the top timeline.</summary>
-        private void createReviewStroke(System.Collections.Generic.IReadOnlyList<Vector2> points)
-        {
-            var pts = new System.Collections.Generic.List<float[]>(points.Count);
-            foreach (var p in points)
-                pts.Add(new[] { p.X, p.Y });
-
-            double start = Math.Round(CurrentTime);
-            var stroke = new Annotations.Annotation
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                Kind = Annotations.Annotation.KindShape,
-                Time = start,
-                EndTime = start + default_stroke_duration_ms,
-                X = points[0].X,
-                Y = points[0].Y,
-                Author = reviewAuthorName(),
-                Color = settings.ReviewAuthorColour.Value.ToHex(),
-                Points = pts,
-                Thickness = 3f,
-            };
-            pushUndo();
-            reviewDoc.Annotations.Add(stroke);
-            refreshAnnotations();
-            editable.IsDirty.Value = true;
-        }
-
-        /// <summary>Clicking a stroke in Review mode removes it.</summary>
-        private void onLineClicked(Annotations.Annotation stroke)
-        {
-            pushUndo();
-            reviewDoc.Annotations.RemoveAll(a => a.Id == stroke.Id);
-            refreshAnnotations();
-            editable.IsDirty.Value = true;
-            toasts?.Push("Stroke removed", EditorTheme.Colours.TextMuted);
         }
 
         // --- Timestamp navigation: clicking a note's timestamp seeks there and briefly selects its objects ---
@@ -1411,9 +1591,23 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private void importReviewLayerPrompt()
             => toasts?.Push("Drag a .sobemod file onto the window to import it", EditorTheme.Colours.Info);
 
+        private static readonly string[] background_extensions = { ".jpg", ".jpeg", ".png", ".bmp" };
+
         private void onReviewFileDropped(string path)
         {
-            if (!this.IsCurrentScreen() || System.IO.Path.GetExtension(path).ToLowerInvariant() != Annotations.AnnotationStore.FileExtension)
+            if (!this.IsCurrentScreen())
+                return;
+
+            string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+
+            // Dropping an image sets it as the map's background (persisted on the next save).
+            if (background_extensions.Contains(ext))
+            {
+                applyDroppedBackground(path);
+                return;
+            }
+
+            if (!review_enabled || ext != Annotations.AnnotationStore.FileExtension)
                 return;
 
             var imported = Annotations.AnnotationStore.ImportFromFile(path);
@@ -1435,6 +1629,40 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 ? " (note: it was authored on a different version of this map)" : string.Empty;
             toasts?.Push($"Imported {added} annotation{(added == 1 ? "" : "s")} from {imported.Author}{warn}",
                 added > 0 ? EditorTheme.Colours.Success : EditorTheme.Colours.Info);
+        }
+
+        /// <summary>
+        /// Sets a dropped image as the map background: swaps the backdrop live and records it as pending so the next
+        /// save writes it into lazer's realm + the .osu [Events]. Keeps the image's own (sanitised) filename.
+        /// </summary>
+        private void applyDroppedBackground(string path)
+        {
+            if (!File.Exists(path))
+                return;
+
+            string targetName = LazerRealmFiles.ValidFilename(Path.GetFileName(path));
+
+            var texture = loadTextureFromPath(host, path);
+            if (texture == null)
+            {
+                toasts?.Push("Couldn't read that image", EditorTheme.Colours.Error);
+                return;
+            }
+
+            currentBackgroundPath = path;
+            pendingBackgroundPath = path;
+            pendingBackgroundName = targetName;
+            parsed.BackgroundFilename = targetName;
+
+            backgroundTexture = texture;
+            applyBackgroundTexture();
+            backgroundDimButton.SongAvailable = true; // enable the dim wheel now there's an image to dim
+
+            editable.HasBackground.Value = true;
+            editable.IsDirty.Value = true;
+
+            toasts?.Push("Background updated (persists when you save)", EditorTheme.Colours.Success,
+                osu.Framework.Graphics.Sprites.FontAwesome.Solid.Image);
         }
 
         private static Color4 toColor4(Colour4 c) => new Color4(c.R, c.G, c.B, c.A);
@@ -1503,6 +1731,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 topTimeline.SetDiscussions(System.Array.Empty<Online.ModdingDiscussion>());
             }
+
+            updateModePill();
         }
 
         // Short-lived cache of fetched discussions, keyed by beatmapset id, shared across editor sessions so
@@ -2104,7 +2334,78 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private void rebuildHitObjects()
         {
-            playfield.SetHitObjects(parsed.HitObjects, circleDiameter(), effectivePreempt());
+            mapVersion++; // invalidates the spacing-guide candidate cache (objects and/or circle size changed)
+            playfield.SetHitObjects(effectiveHitObjects(), circleDiameter(), effectivePreempt());
+            // Red outlines around the objects a suggestion changed (part of the Review diff overlay).
+            bool showDiffOverlay = reviewMode.Value && showDiff;
+            playfield.SetModifiedHighlight(showDiffOverlay ? previewModifiedIds : (IReadOnlyCollection<int>)System.Array.Empty<int>());
+        }
+
+        /// <summary>
+        /// The object list the playfield should render: the real objects, or - while in Review mode - a copy with
+        /// every move suggestion applied (the proposed map). Purely for display; the stored map is untouched.
+        /// </summary>
+        private IReadOnlyList<HitObjectModel> effectiveHitObjects()
+        {
+            previewModifiedIds.Clear();
+            if (!reviewMode.Value)
+                return parsed.HitObjects;
+
+            var deltas = new Dictionary<int, (int dx, int dy)>();
+            foreach (var a in reviewDoc.Annotations)
+            {
+                if (a.Kind != Annotations.Annotation.KindMove || a.Objects == null || a.DX == null || a.DY == null)
+                    continue;
+                int dx = (int)Math.Round(a.DX.Value);
+                int dy = (int)Math.Round(a.DY.Value);
+                foreach (int id in a.Objects)
+                    deltas[id] = (dx, dy); // a later suggestion on the same object wins
+            }
+
+            // The affected ids drive the "modified" tint (via the author-colour hook while previewing).
+            foreach (int id in deltas.Keys)
+                previewModifiedIds.Add(id);
+
+            if (deltas.Count == 0)
+                return parsed.HitObjects;
+
+            var result = new List<HitObjectModel>(parsed.HitObjects.Count);
+            foreach (var o in parsed.HitObjects)
+            {
+                if (o.Kind != HitObjectKind.Spinner && deltas.TryGetValue(o.Id, out var d) && (d.dx != 0 || d.dy != 0))
+                    result.Add(o with
+                    {
+                        X = o.X + d.dx,
+                        Y = o.Y + d.dy,
+                        Path = offsetPath(o.Path, d.dx, d.dy),
+                        ControlPoints = offsetControlPoints(o.ControlPoints, d.dx, d.dy),
+                    });
+                else
+                    result.Add(o);
+            }
+
+            return result;
+        }
+
+        /// <summary>TAB in Review mode: shows/hides the diff overlay (original ghosts + arrows + red outlines). The
+        /// objects stay at their proposed positions either way; this only toggles the before/after annotations.</summary>
+        private void toggleDiff()
+        {
+            showDiff = !showDiff;
+            updateModePill();
+            refreshAnnotations(); // include/exclude the ghost + arrow
+            rebuildHitObjects();  // add/remove the red outlines
+        }
+
+        /// <summary>Updates the top-left mode pill from the current editor state (Review / Modding, else hidden).</summary>
+        private void updateModePill()
+        {
+            if (reviewMode.Value)
+                modePill.SetMode(showDiff ? "Review" : "Review • clean", new Color4(0.82f, 0.31f, 0.36f, 1f));
+            else if (moddingMode.Value)
+                modePill.SetMode("Modding", EditorTheme.Colours.Accent);
+            else
+                modePill.SetMode(null, default);
         }
 
         /// <summary>A sample store over the active skin's folder (its hitsounds), or null when no skin is active.</summary>
@@ -3257,6 +3558,65 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private const float blanket_snap_threshold = 14f;
         private const float existing_blanket_threshold = 6f;
 
+        /// <summary>One cached spacing-guide candidate: a visible, non-excluded object with its endpoints and (if it's
+        /// a blanket-able curved slider) its fitted arc. See <see cref="ensureSpacingCandidates"/>.</summary>
+        private readonly record struct SpacingCandidate(int Id, Vector2 Start, Vector2 End, double Time, bool HasArc, Vector2 ArcCentre, float ArcRadius);
+
+        // The gather that feeds ResolveSpacingGuide is O(N over the whole map) and its result (which objects are
+        // visible + their fitted arcs) only changes with the playhead time or an edit - NOT with the cursor. So we
+        // rebuild it only when the time or map version changes, and every mouse-move frame just filters this list.
+        private readonly List<SpacingCandidate> spacingCandidates = new List<SpacingCandidate>();
+        private double spacingCacheTime = double.NaN;
+        private int spacingCacheVersion = -1;
+        private float spacingCacheRadius = -1f;
+
+        /// <summary>Bumped by <see cref="rebuildHitObjects"/> so the spacing-candidate cache invalidates on any edit.</summary>
+        private int mapVersion;
+
+        /// <summary>
+        /// Rebuilds <see cref="spacingCandidates"/> only when the playhead time, the map, or the circle size has
+        /// changed since the last gather (otherwise it's a no-op, so holding Shift and moving the mouse is cheap).
+        /// </summary>
+        private void ensureSpacingCandidates(float r, float blMin, float blMax)
+        {
+            double now = CurrentTime;
+            if (spacingCacheVersion == mapVersion && spacingCacheTime.Equals(now) && spacingCacheRadius == r)
+                return;
+
+            spacingCandidates.Clear();
+            foreach (var o in parsed.HitObjects)
+            {
+                if (o.Kind == HitObjectKind.Spinner || selection.Contains(o.Id) || streamPreviewIds.Contains(o.Id)
+                    || !playfield.IsObjectVisible(o))
+                    continue;
+
+                Vector2 start = new Vector2(o.X, o.Y);
+                Vector2 end = start;
+                IReadOnlyList<Vector2>? path = null;
+                if (o.Kind == HitObjectKind.Slider && o.Path is { Count: > 0 } p)
+                {
+                    end = p[^1];
+                    path = p;
+                }
+
+                Vector2 arcCentre = Vector2.Zero;
+                float arcRadius = 0;
+                bool hasArc = false;
+                if (path is { Count: >= 3 } && tryFitArc(path, out Vector2 ac, out float ar) && ar >= blMin && ar <= blMax)
+                {
+                    hasArc = true;
+                    arcCentre = ac;
+                    arcRadius = ar;
+                }
+
+                spacingCandidates.Add(new SpacingCandidate(o.Id, start, end, o.StartTime, hasArc, arcCentre, arcRadius));
+            }
+
+            spacingCacheTime = now;
+            spacingCacheVersion = mapVersion;
+            spacingCacheRadius = r;
+        }
+
         /// <summary>
         /// Resolves the Shift-held spacing guide at a cursor position. It shows the spacing that already exists
         /// around the cursor - a solid line + gap label between each pair of temporally-consecutive nearby
@@ -3275,32 +3635,20 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             float blMin = r * blanket_min_radius_factor;
             float blMax = r * blanket_max_radius_factor;
 
-            // Visible, non-excluded objects near the cursor (time-ordered), plus the fitted arc of any curved
-            // slider among them (for blankets). Only visible objects count, so nothing off-screen leaks in.
+            // Gather the visible, non-excluded objects (+ fitted arcs) - cached across frames since it only
+            // depends on the playhead/map, not the cursor - then keep just those near the cursor, time-ordered.
+            ensureSpacingCandidates(r, blMin, blMax);
+
             var vis = new List<(int id, Vector2 start, Vector2 end, double t)>();
             var arcs = new List<(int id, Vector2 centre, float radius)>();
-            foreach (var o in parsed.HitObjects)
+            foreach (var c in spacingCandidates)
             {
-                if (o.Kind == HitObjectKind.Spinner || selection.Contains(o.Id) || streamPreviewIds.Contains(o.Id)
-                    || !playfield.IsObjectVisible(o))
+                if (Vector2.DistanceSquared(c.Start, cursor) > searchSq && Vector2.DistanceSquared(c.End, cursor) > searchSq)
                     continue;
 
-                Vector2 start = new Vector2(o.X, o.Y);
-                Vector2 end = start;
-                IReadOnlyList<Vector2>? path = null;
-                if (o.Kind == HitObjectKind.Slider && o.Path is { Count: > 0 } p)
-                {
-                    end = p[^1];
-                    path = p;
-                }
-
-                if (Vector2.DistanceSquared(start, cursor) > searchSq && Vector2.DistanceSquared(end, cursor) > searchSq)
-                    continue;
-
-                vis.Add((o.Id, start, end, o.StartTime));
-
-                if (path is { Count: >= 3 } && tryFitArc(path, out Vector2 arcC, out float arcR) && arcR >= blMin && arcR <= blMax)
-                    arcs.Add((o.Id, arcC, arcR));
+                vis.Add((c.Id, c.Start, c.End, c.Time));
+                if (c.HasArc)
+                    arcs.Add((c.Id, c.ArcCentre, c.ArcRadius));
             }
 
             if (vis.Count == 0)
@@ -3442,30 +3790,51 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             return true;
         }
 
+        // The distance-snap target (previous object's end + the spaced distance) depends only on the placement
+        // time, the map, and the spacing multiplier - not the cursor. Cache it so moving the mouse doesn't rescan
+        // the objects (previousObject is O(N)) and timing points every frame; only the final direction is per-cursor.
+        private double distSnapCacheTime = double.NaN;
+        private int distSnapCacheVersion = -1;
+        private double distSnapCacheSpacing = double.NaN;
+        private bool distSnapCacheValid;
+        private Vector2 distSnapPrevEnd;
+        private float distSnapDistance;
+
         /// <summary>Constrains a placement position to a distance from the previous object equal to its time gap times the slider velocity.</summary>
         private Vector2 applyDistanceSnap(Vector2 cursor, double time)
         {
-            var prev = previousObject(time);
-            if (prev == null)
+            if (!(distSnapCacheVersion == mapVersion && distSnapCacheTime.Equals(time) && distSnapCacheSpacing.Equals(distanceSpacing)))
+            {
+                distSnapCacheTime = time;
+                distSnapCacheVersion = mapVersion;
+                distSnapCacheSpacing = distanceSpacing;
+                distSnapCacheValid = false;
+
+                var prev = previousObject(time);
+                if (prev is { } p)
+                {
+                    Vector2 prevEnd = p.Kind == HitObjectKind.Slider && p.Path is { Count: > 0 } path ? path[^1] : new Vector2(p.X, p.Y);
+                    double prevEndTime = p.StartTime + (p.Kind == HitObjectKind.Slider ? p.Duration : 0);
+                    double dt = time - prevEndTime;
+                    if (dt > 0)
+                    {
+                        double velocity = pixelVelocityAt(prevEndTime); // osu!px per ms
+                        distSnapPrevEnd = prevEnd;
+                        distSnapDistance = (float)(distanceSpacing * velocity * dt);
+                        distSnapCacheValid = true;
+                    }
+                }
+            }
+
+            if (!distSnapCacheValid)
                 return cursor;
 
-            var p = prev.Value;
-            Vector2 prevEnd = p.Kind == HitObjectKind.Slider && p.Path is { Count: > 0 } path ? path[^1] : new Vector2(p.X, p.Y);
-            double prevEndTime = p.StartTime + (p.Kind == HitObjectKind.Slider ? p.Duration : 0);
-
-            double dt = time - prevEndTime;
-            if (dt <= 0)
-                return cursor;
-
-            double velocity = pixelVelocityAt(prevEndTime); // osu!px per ms
-            double distance = distanceSpacing * velocity * dt;
-
-            Vector2 dir = cursor - prevEnd;
+            Vector2 dir = cursor - distSnapPrevEnd;
             if (dir.LengthSquared < 1e-3f)
                 dir = new Vector2(1, 0);
             dir = Vector2.Normalize(dir);
 
-            return prevEnd + dir * (float)distance;
+            return distSnapPrevEnd + dir * distSnapDistance;
         }
 
         /// <summary>The slider-velocity in osu!pixels per millisecond at the given time.</summary>
@@ -3979,6 +4348,38 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             // Restore time order, then rebuild (which clears the preview transforms).
             parsed.HitObjects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
+            afterEdit();
+        }
+
+        /// <summary>
+        /// Nudges the selected objects by (dx, dy) osu!pixels (the arrow keys), clamped so the whole selection
+        /// stays on the playfield. Reuses the drag snapshot/commit path so it behaves exactly like a tiny move.
+        /// </summary>
+        private void nudgeSelection(int dx, int dy)
+        {
+            if (selection.Selected.Count == 0)
+                return;
+
+            BeginMove(); // snapshots the selection and computes its movable bounds
+
+            // Spinner-only selection has no movable bounds - nothing to nudge.
+            if (moveSnapshot.Count == 0 || moveMin.X > moveMax.X)
+            {
+                moveSnapshot.Clear();
+                return;
+            }
+
+            int cdx = (int)Math.Clamp(dx, -moveMin.X, ParsedBeatmap.PLAYFIELD_WIDTH - moveMax.X);
+            int cdy = (int)Math.Clamp(dy, -moveMin.Y, ParsedBeatmap.PLAYFIELD_HEIGHT - moveMax.Y);
+            if (cdx == 0 && cdy == 0)
+            {
+                moveSnapshot.Clear();
+                return;
+            }
+
+            pushUndo();
+            commitPositionMove(cdx, cdy);
+            moveSnapshot.Clear();
             afterEdit();
         }
 
@@ -5428,6 +5829,42 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             bookmarksChanged();
         }
 
+        /// <summary>Seeks to the previous (or next) bookmark relative to the current time (Ctrl+Left / Ctrl+Right).</summary>
+        private void seekBookmark(bool forward)
+        {
+            if (parsed.Bookmarks.Count == 0)
+                return;
+
+            double now = CurrentTime;
+            int? target = null;
+
+            // Bookmarks are kept sorted ascending; a small margin avoids sticking on the current one.
+            if (forward)
+            {
+                foreach (int b in parsed.Bookmarks)
+                {
+                    if (b > now + 1)
+                    {
+                        target = b;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                foreach (int b in parsed.Bookmarks)
+                {
+                    if (b < now - 1)
+                        target = b;
+                    else
+                        break;
+                }
+            }
+
+            if (target is int t)
+                seekTo(t);
+        }
+
         private void bookmarksChanged()
         {
             topTimeline.Rebuild();
@@ -5517,39 +5954,65 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (bgPath == null)
                 return null;
 
-            var storage = new NativeStorage(Path.GetDirectoryName(bgPath)!, host);
+            currentBackgroundPath = bgPath;
+            return loadTextureFromPath(host, bgPath);
+        }
+
+        /// <summary>Loads an image at an absolute path as a texture (used for both the stored background and a dropped one).</summary>
+        private Texture? loadTextureFromPath(GameHost host, string path)
+        {
+            var storage = new NativeStorage(Path.GetDirectoryName(path)!, host);
             textures = new LargeTextureStore(host.Renderer, host.CreateTextureLoaderStore(new StorageBackedResourceStore(storage)));
-            return textures.Get(Path.GetFileName(bgPath));
+            return textures.Get(Path.GetFileName(path));
         }
 
         /// <summary>
         /// The editor backdrop: the song background image with an adjustable dim, over a solid base for when
-        /// the map has no background. The <see cref="BackgroundToggleButton"/> dim wheel drives the dim.
+        /// the map has no background. The <see cref="BackgroundToggleButton"/> dim wheel drives the dim. The sprite
+        /// and dim are kept as fields so a dragged-in image can be swapped in live via <see cref="applyBackgroundTexture"/>.
         /// </summary>
         private Drawable buildBackground(GameHost host)
         {
-            var layers = new Container { RelativeSizeAxes = Axes.Both };
-
-            // Solid base so transparency never shows through (and the backdrop when there's no image).
-            layers.Add(new Box { RelativeSizeAxes = Axes.Both, Colour = OsuColour.BackgroundDark });
-
-            if (backgroundTexture != null)
+            backgroundLayers = new Container
             {
-                layers.Add(new Sprite
+                RelativeSizeAxes = Axes.Both,
+                Children = new Drawable[]
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    FillMode = FillMode.Fill,
-                    Texture = backgroundTexture,
-                });
+                    // Solid base so transparency never shows through (and the backdrop when there's no image).
+                    new Box { RelativeSizeAxes = Axes.Both, Colour = OsuColour.BackgroundDark },
+                    backgroundSprite = new Sprite
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        FillMode = FillMode.Fill,
+                        Alpha = 0,
+                    },
+                    backgroundDim = new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Black, Alpha = 0 },
+                },
+            };
 
-                var dim = new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Black };
-                settings.BackgroundDim.BindValueChanged(v => dim.Alpha = v.NewValue, true);
-                layers.Add(dim);
-            }
+            // Bound once (no re-subscription on swap); the dim only shows when there's an image.
+            settings.BackgroundDim.BindValueChanged(_ => updateBackgroundDim(), true);
+            applyBackgroundTexture();
+            return backgroundLayers;
+        }
 
-            return layers;
+        /// <summary>Points the backdrop sprite at the current <see cref="backgroundTexture"/> (or hides it if none).</summary>
+        private void applyBackgroundTexture()
+        {
+            if (backgroundSprite == null)
+                return;
+
+            backgroundSprite.Texture = backgroundTexture;
+            backgroundSprite.Alpha = backgroundTexture != null ? 1 : 0;
+            updateBackgroundDim();
+        }
+
+        private void updateBackgroundDim()
+        {
+            if (backgroundDim != null)
+                backgroundDim.Alpha = backgroundTexture != null ? settings.BackgroundDim.Value : 0;
         }
 
         // Small Song Setup / Settings buttons tucked into the top-left, just below the top timeline.
@@ -5839,8 +6302,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return true;
             }
 
-            // Ctrl+Shift+A toggles Review mode (the modding-annotation layer).
-            if (settings.ReviewModeKey.Value.Matches(e) && !e.Repeat && !confirmExit.State.Value.Equals(Visibility.Visible))
+            // Ctrl+Shift+A toggles Review mode (the modding-annotation layer). Disabled for now (review_enabled).
+            if (review_enabled && settings.ReviewModeKey.Value.Matches(e) && !e.Repeat && !confirmExit.State.Value.Equals(Visibility.Visible))
             {
                 reviewMode.Value = !reviewMode.Value;
                 return true;
@@ -5972,11 +6435,29 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return true;
             }
 
-            // While reviewing, the number keys pick the Review tools (1 select, 2 note, 3 line) instead of the
-            // composing tools (which are suppressed in Review mode anyway).
-            if (reviewMode.Value && !e.Repeat && e.Key is Key.Number1 or Key.Number2 or Key.Number3)
+            // Ctrl+Left / Ctrl+Right jump to the previous / next bookmark.
+            if (cmd && !e.Repeat && (e.Key == Key.Left || e.Key == Key.Right))
             {
-                applyReviewTool(e.Key switch { Key.Number2 => ReviewTool.Note, Key.Number3 => ReviewTool.Draw, _ => ReviewTool.Select });
+                seekBookmark(e.Key == Key.Right);
+                return true;
+            }
+
+            // Arrow keys nudge the selected objects by 1 osu!px (fine positioning). Only fires with a selection;
+            // otherwise the arrows fall through. (Ctrl+arrows are handled above for bookmark navigation.)
+            if (!cmd && !e.Repeat && selection.Selected.Count > 0
+                && e.Key is Key.Left or Key.Right or Key.Up or Key.Down)
+            {
+                int nx = e.Key == Key.Left ? -1 : e.Key == Key.Right ? 1 : 0;
+                int ny = e.Key == Key.Up ? -1 : e.Key == Key.Down ? 1 : 0;
+                nudgeSelection(nx, ny);
+                return true;
+            }
+
+            // While reviewing, the number keys pick the Review tools (1 select, 2 note) instead of the composing
+            // tools (which are suppressed in Review mode anyway).
+            if (reviewMode.Value && !e.Repeat && e.Key is Key.Number1 or Key.Number2)
+            {
+                applyReviewTool(e.Key == Key.Number2 ? ReviewTool.Note : ReviewTool.Select);
                 return true;
             }
 
@@ -6066,6 +6547,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (e.Key == Key.Tab && e.ShiftPressed && !cmd && !e.Repeat)
             {
                 toggleHud();
+                return true;
+            }
+
+            // Tab (in Review) shows/hides the diff overlay (original ghost + arrow + red outline); the objects stay
+            // at their proposed positions either way.
+            if (e.Key == Key.Tab && !e.ShiftPressed && !cmd && !e.Repeat && reviewMode.Value)
+            {
+                toggleDiff();
                 return true;
             }
 
@@ -6183,6 +6672,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             SliderMultiplier = editable.SliderMultiplier.Value,
             SliderTickRate = editable.SliderTickRate.Value,
             ComboColours = editable.MapColours.Select(c => c.Value).ToList(),
+            // Only rewrite the [Events] background when the user dropped a new one this session; otherwise leave
+            // the original [Events] verbatim so a plain save doesn't re-hash the .osu for no reason.
+            BackgroundFilename = pendingBackgroundName ?? string.Empty,
         };
 
         private bool save()
@@ -6201,14 +6693,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             bool ok;
             if (!string.IsNullOrEmpty(difficulty.OsuFileHash))
             {
-                string? error = BeatmapRealmWriter.Save(set, difficulty, parsed, edits);
+                string? error = BeatmapRealmWriter.Save(set, difficulty, parsed, edits, pendingBackgroundPath, pendingBackgroundName);
                 ok = error == null;
                 if (!ok)
                     toasts?.Push($"Save failed: {error}", EditorTheme.Colours.Error);
             }
             else
             {
-                ok = BeatmapSaver.Save(set, difficulty, parsed, edits);
+                ok = BeatmapSaver.Save(set, difficulty, parsed, edits, pendingBackgroundPath, pendingBackgroundName);
                 if (!ok)
                     toasts?.Push("Save failed", EditorTheme.Colours.Error);
             }
@@ -6217,6 +6709,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 editable.IsDirty.Value = false;
                 DidSave = true;
+
+                // The dropped background is now persisted; clear the pending state so a re-save doesn't re-add it.
+                pendingBackgroundPath = null;
+                pendingBackgroundName = null;
                 // Persist the Review layer alongside the map (the .osu re-hashes on save; the layer is keyed by a
                 // stable per-difficulty key, and stamps the new hash so an export reflects the saved version).
                 saveReviewLayer();

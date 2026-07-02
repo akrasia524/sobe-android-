@@ -45,6 +45,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Fired whenever the rendered combo palette changes (map colours, editor palette, or the toggle).</summary>
         public event Action? ColoursChanged;
 
+        /// <summary>True while the open map has a background image (drives the "auto colours from background" UI).</summary>
+        public readonly BindableBool HasBackground = new BindableBool();
+
+        /// <summary>Set by the editor: extracts <c>n</c> combo colours from the current background image (empty if none).</summary>
+        public Func<int, IReadOnlyList<Colour4>>? ExtractBackgroundColours;
+
         public readonly BindableBool IsDirty = new BindableBool();
 
         private readonly EditorSettings settings;
@@ -118,6 +124,22 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         /// <summary>Removes the given map combo colour entry.</summary>
         public void RemoveMapColour(Bindable<Colour4> colour) => MapColours.Remove(colour);
+
+        /// <summary>
+        /// Replaces the whole map palette with <paramref name="colours"/> (used by "auto colours from background")
+        /// and turns on the "use map colours" toggle so the new palette renders immediately.
+        /// </summary>
+        public void SetMapColours(IReadOnlyList<Colour4> colours)
+        {
+            if (colours.Count == 0)
+                return;
+
+            MapColours.Clear();
+            foreach (var c in colours)
+                MapColours.Add(makeColour(c));
+
+            settings.UseMapColours.Value = true;
+        }
 
         /// <summary>
         /// The combo colour for the given combo index, honouring the editor's "use map colours" toggle:

@@ -30,13 +30,14 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         /// Writes the edited difficulty into osu!lazer's realm in place. Returns <c>null</c> on success,
         /// otherwise a human-readable error message.
         /// </summary>
-        public static string? Save(BeatmapSetModel set, BeatmapDifficultyModel difficulty, ParsedBeatmap parsed, BeatmapSaver.Edits edits)
+        public static string? Save(BeatmapSetModel set, BeatmapDifficultyModel difficulty, ParsedBeatmap parsed, BeatmapSaver.Edits edits,
+            string? newBackgroundPath = null, string? newBackgroundName = null)
         {
             string? patched = BeatmapSaver.BuildPatchedOsu(set, difficulty, parsed, edits);
             if (patched == null)
                 return "The original .osu file could not be located.";
 
-            return writeOsu(set, difficulty, new UTF8Encoding(false).GetBytes(patched), edits);
+            return writeOsu(set, difficulty, new UTF8Encoding(false).GetBytes(patched), edits, newBackgroundPath, newBackgroundName);
         }
 
         /// <summary>
@@ -75,7 +76,8 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         };
 
         /// <summary>Stores the given .osu bytes for the difficulty and re-points its realm entry (shared by Save/SaveRaw).</summary>
-        private static string? writeOsu(BeatmapSetModel set, BeatmapDifficultyModel difficulty, byte[] bytes, BeatmapSaver.Edits edits)
+        private static string? writeOsu(BeatmapSetModel set, BeatmapDifficultyModel difficulty, byte[] bytes, BeatmapSaver.Edits edits,
+            string? newBackgroundPath = null, string? newBackgroundName = null)
         {
             string oldHash = difficulty.OsuFileHash;
             if (string.IsNullOrEmpty(oldHash))
@@ -115,7 +117,7 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                 // expression body would bind to Write<T>(Func<T>) and throw on the void/object mismatch.
                 realm.Write(() =>
                 {
-                    error = applyEdit(realm, targetSet, oldHash, newSha, newMd5, targetFilename, edits, dataDir);
+                    error = applyEdit(realm, targetSet, oldHash, newSha, newMd5, targetFilename, edits, dataDir, newBackgroundPath, newBackgroundName);
                 });
 
                 if (error == null)
@@ -137,7 +139,8 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         }
 
         /// <summary>Applies every in-place change for the edited difficulty inside an open write transaction.</summary>
-        private static string? applyEdit(Realm realm, dynamic targetSet, string oldHash, string newSha, string newMd5, string targetFilename, BeatmapSaver.Edits e, string dataDir)
+        private static string? applyEdit(Realm realm, dynamic targetSet, string oldHash, string newSha, string newMd5, string targetFilename, BeatmapSaver.Edits e, string dataDir,
+            string? newBackgroundPath = null, string? newBackgroundName = null)
         {
             // The beatmap (difficulty) we edited, located by its current .osu content hash.
             dynamic? beatmap = null;
@@ -209,6 +212,39 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                 metadata.Tags = e.Tags;
                 if (metadata.Author != null)
                     metadata.Author.Username = e.Creator;
+            }
+
+            // A dragged-in background: store the image in the content store, point a file usage at it (reusing an
+            // existing usage with the same filename, else adding one), and record it on the metadata so lazer shows
+            // it. The [Events] line was already rewritten into the patched .osu (so the new content hash matches).
+            if (!string.IsNullOrEmpty(newBackgroundPath) && !string.IsNullOrEmpty(newBackgroundName) && File.Exists(newBackgroundPath))
+            {
+                byte[] bgBytes = File.ReadAllBytes(newBackgroundPath);
+                string bgSha = LazerRealmFiles.Sha256Hex(bgBytes);
+                LazerRealmFiles.WriteToStore(dataDir, bgSha, bgBytes);
+                dynamic bgFile = LazerRealmFiles.ResolveOrCreateFile(realm, bgSha);
+
+                dynamic? bgUsage = null;
+                foreach (dynamic u in targetSet.Files)
+                {
+                    if (u.Filename is string fn && string.Equals(fn, newBackgroundName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        bgUsage = u;
+                        break;
+                    }
+                }
+
+                if (bgUsage != null)
+                    bgUsage.File = bgFile;
+                else
+                {
+                    dynamic added = realm.DynamicApi.AddEmbeddedObjectToList((System.Collections.IList)targetSet.Files);
+                    added.File = bgFile;
+                    added.Filename = newBackgroundName;
+                }
+
+                if (metadata != null)
+                    metadata.BackgroundFile = newBackgroundName;
             }
 
             // Recompute the set hash exactly as lazer's importer does (SHA-256 over the set's .osu file

@@ -22,6 +22,10 @@ namespace OsuBeatmapEditor.Game.Annotations
         public const string KindShape = "shape";
         public const string KindStroke = "stroke";
 
+        /// <summary>A suggested move of one or more existing objects by (<see cref="DX"/>, <see cref="DY"/>) osu!pixels
+        /// (the referenced <see cref="Objects"/>). Shown to the mapper as a ghost + arrow they can accept or discard.</summary>
+        public const string KindMove = "move";
+
         // Note categories (mirroring osu! modding), each shown with its own icon.
         public const string TypeNote = "note";
         public const string TypePraise = "praise";
@@ -76,6 +80,10 @@ namespace OsuBeatmapEditor.Game.Annotations
         /// <summary>Whether a <see cref="KindShape"/> line draws an arrow head at its end.</summary>
         public bool Arrow { get; set; }
 
+        /// <summary>Suggested move delta (osu!pixels) for a <see cref="KindMove"/> suggestion; applies to every id in <see cref="Objects"/>.</summary>
+        public float? DX { get; set; }
+        public float? DY { get; set; }
+
         /// <summary>A deep copy (lists included), so undo/redo snapshots don't share mutable state with the live note.</summary>
         public Annotation Clone() => new Annotation
         {
@@ -95,6 +103,8 @@ namespace OsuBeatmapEditor.Game.Annotations
             DurationMs = DurationMs,
             Thickness = Thickness,
             Arrow = Arrow,
+            DX = DX,
+            DY = DY,
         };
     }
 }

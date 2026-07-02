@@ -27,6 +27,9 @@ namespace OsuBeatmapEditor.Game.Beatmaps
 
             /// <summary>The map's own combo colours ([Colours] ComboN), in order. Empty = no [Colours] section.</summary>
             public List<Colour4> ComboColours = new List<Colour4>();
+
+            /// <summary>The background image filename to write into [Events] (empty = leave the original untouched).</summary>
+            public string BackgroundFilename = "";
         }
 
         /// <summary>
@@ -72,7 +75,8 @@ namespace OsuBeatmapEditor.Game.Beatmaps
 
         private static int toByte(float component) => (int)Math.Round(Math.Clamp(component, 0f, 1f) * 255f);
 
-        public static bool Save(BeatmapSetModel set, BeatmapDifficultyModel difficulty, ParsedBeatmap parsed, Edits edits)
+        public static bool Save(BeatmapSetModel set, BeatmapDifficultyModel difficulty, ParsedBeatmap parsed, Edits edits,
+            string? newBackgroundPath = null, string? newBackgroundName = null)
         {
             string? patched = BuildPatchedOsu(set, difficulty, parsed, edits);
             if (patched == null)
@@ -124,6 +128,13 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                     using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
                     writer.Write(patched);
                 }
+
+                // A dragged-in background that isn't already among the set's files: add it under its target name.
+                if (!string.IsNullOrEmpty(newBackgroundPath) && !string.IsNullOrEmpty(newBackgroundName) && File.Exists(newBackgroundPath)
+                    && !set.Files.Keys.Any(n => string.Equals(n, newBackgroundName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    archive.CreateEntryFromFile(newBackgroundPath, newBackgroundName, CompressionLevel.NoCompression);
+                }
             }
 
             return LazerImporter.Import(oszPath);
@@ -135,6 +146,7 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             string section = string.Empty;
             bool editorSectionSeen = false;
             bool coloursSectionSeen = false;
+            bool eventsSectionSeen = false;
 
             foreach (string raw in lines)
             {
@@ -146,6 +158,8 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                         editorSectionSeen = true;
                     if (section == "Colours")
                         coloursSectionSeen = true;
+                    if (section == "Events")
+                        eventsSectionSeen = true;
                     sb.Append(raw).Append('\n');
 
                     // Replace the entire hit-object body with the current (edited) lines.
@@ -173,11 +187,20 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                             sb.Append(colour).Append('\n');
                     }
 
+                    // Re-emit the background event at the top of [Events] when the background changed (a dropped
+                    // image); the original background line is then skipped below so there's exactly one.
+                    if (section == "Events" && !string.IsNullOrEmpty(e.BackgroundFilename))
+                        sb.Append($"0,0,\"{e.BackgroundFilename}\",0,0").Append('\n');
+
                     continue;
                 }
 
                 // Skip the original hit-object / timing-point lines; they were re-emitted under the header.
                 if (section == "HitObjects" || section == "TimingPoints")
+                    continue;
+
+                // Skip the original background event when we've re-emitted our own (keeps break periods/storyboard).
+                if (section == "Events" && !string.IsNullOrEmpty(e.BackgroundFilename) && isBackgroundEventLine(trimmed))
                     continue;
 
                 // Skip the original Bookmarks line; the current one was re-emitted under the [Editor] header.
@@ -211,7 +234,18 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                     sb.Append(colour).Append('\n');
             }
 
+            // And an [Events] section with just the background, if the file had none but we set one.
+            if (!eventsSectionSeen && !string.IsNullOrEmpty(e.BackgroundFilename))
+                sb.Append("\n[Events]\n").Append($"0,0,\"{e.BackgroundFilename}\",0,0").Append('\n');
+
             return sb.ToString();
+        }
+
+        /// <summary>Whether an [Events] line is the background image event (type 0), mirroring the decoder's detection.</summary>
+        private static bool isBackgroundEventLine(string trimmed)
+        {
+            string[] parts = trimmed.Split(',');
+            return parts.Length >= 3 && parts[0].Trim() == "0" && parts[2].Contains('"');
         }
 
         private static string replaceGeneral(string line, Edits e)

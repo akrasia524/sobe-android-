@@ -45,9 +45,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Raised after a note is dragged to a new position (commit the move).</summary>
         public Action<Annotation>? NoteMoved;
 
-        /// <summary>Raised when a line is clicked while editable (deletes it).</summary>
-        public Action<Annotation>? LineClicked;
-
         /// <summary>Raised when a note's own timestamp chip is clicked: seek to it and select its referenced objects.</summary>
         public Action<Annotation>? OnTimestampActivated;
 
@@ -66,8 +63,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Pushed every frame: per object id, the colour + alpha to draw its highlight at (alpha tracks the note's fade).</summary>
         public Action<Dictionary<int, (Colour4 colour, float alpha)>>? OnHighlightsChanged;
 
+        /// <summary>Resolves a hit object's current head position (osu!pixels, incl. stacking) by id, for move suggestions.</summary>
+        public Func<int, Vector2?>? ObjectHeadResolver;
+
+        /// <summary>Object diameter (osu!pixels) used to size a suggestion's ghost rings.</summary>
+        public float ObjectDiameter = 40f;
+
         private readonly Dictionary<string, AnnotationNote> notes = new Dictionary<string, AnnotationNote>();
-        private readonly List<AnnotationStroke> strokes = new List<AnnotationStroke>();
         private readonly Dictionary<int, (Colour4 colour, float alpha)> highlightBuffer = new Dictionary<int, (Colour4, float)>();
 
         // mm:ss:fff with an optional (1,2,3) object list - the osu! timestamp format.
@@ -86,7 +88,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             ClearInternal();
             notes.Clear();
-            strokes.Clear();
 
             foreach (var a in annotations)
             {
@@ -107,17 +108,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     notes[a.Id] = note;
                     AddInternal(note);
                 }
-                else if ((a.Kind == Annotation.KindShape || a.Kind == Annotation.KindStroke) && a.Points is { Count: >= 2 })
+                else if (a.Kind == Annotation.KindMove && ObjectHeadResolver != null)
                 {
-                    var stroke = new AnnotationStroke(a)
-                    {
-                        LayerEditable = () => Editable,
-                        OnDelete = () => LineClicked?.Invoke(a),
-                        OnMoveBegin = () => NoteMoveStart?.Invoke(),
-                        OnMoved = () => NoteMoved?.Invoke(a),
-                    };
-                    strokes.Add(stroke);
-                    AddInternal(stroke);
+                    AddInternal(new AnnotationMoveSuggestion(a, ObjectHeadResolver, ObjectDiameter, () => TimeSource?.Invoke() ?? 0));
                 }
             }
         }
@@ -135,8 +128,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             double now = TimeSource?.Invoke() ?? 0;
             foreach (var note in notes.Values)
                 note.UpdateForTime(now);
-            foreach (var stroke in strokes)
-                stroke.UpdateForTime(now);
 
             updateHighlights();
         }
@@ -502,132 +493,5 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
         }
 
-        /// <summary>
-        /// A freehand "Draw" stroke (osu!pixel space) rendered as a smoothed path. A static one (Kind=shape) fades
-        /// in/out with the playhead like a note; a timed one (Kind=stroke) is revealed progressively over its
-        /// <see cref="Annotation.DurationMs"/> from its start time (it "draws itself" as you play). Clicking the
-        /// stroke (while editable) deletes it - hit-testing uses the path itself, so only the line is clickable.
-        /// </summary>
-        private partial class AnnotationStroke : CompositeDrawable
-        {
-            public Func<bool>? LayerEditable;
-            public Action? OnDelete;
-            public Action? OnMoveBegin;
-            public Action? OnMoved;
-
-            private readonly Annotation annotation;
-            private SmoothPath path = null!;
-            private Vector2[] points = Array.Empty<Vector2>();
-            private float targetAlpha = 1f;
-            private int lastCount = -1;
-            private bool forceRebuild;
-            private Vector2[] dragOriginal = Array.Empty<Vector2>();
-            private Vector2 dragGrab;
-
-            public AnnotationStroke(Annotation annotation)
-            {
-                this.annotation = annotation;
-                RelativeSizeAxes = Axes.Both;
-            }
-
-            [osu.Framework.Allocation.BackgroundDependencyLoader]
-            private void load()
-            {
-                Color4 colour = ParseColour(annotation.Color);
-                var pts = annotation.Points!;
-                points = new Vector2[pts.Count];
-                for (int i = 0; i < pts.Count; i++)
-                    points[i] = new Vector2(pts[i][0], pts[i][1]);
-
-                float thickness = annotation.Thickness ?? 3f;
-                InternalChild = path = new SmoothPath { PathRadius = Math.Max(1.5f, thickness / 2f), Colour = colour };
-
-                setVertices(points.Length);
-            }
-
-            /// <summary>Shows the first <paramref name="count"/> points of the stroke (absolute osu! coords, re-anchored).</summary>
-            private void setVertices(int count)
-            {
-                count = Math.Clamp(count, 0, points.Length);
-                if (count == lastCount && !forceRebuild)
-                    return;
-                lastCount = count;
-                forceRebuild = false;
-
-                if (count < 2)
-                {
-                    path.Vertices = Array.Empty<Vector2>();
-                    return;
-                }
-
-                path.Vertices = points[..count];
-                path.Position = -path.PositionInBoundingBox(Vector2.Zero); // keep vertices at their absolute coords
-            }
-
-            public void UpdateForTime(double now)
-            {
-                // Visible across its [Time, EndTime] range (set/tuned on the top timeline), with a short fade at each edge.
-                const double fade = 150;
-                double start = annotation.Time;
-                double end = Math.Max(start + 1, annotation.EndTime ?? start + 1000);
-
-                float a;
-                if (now < start)
-                    a = (float)Math.Clamp(1 - (start - now) / fade, 0, 1);
-                else if (now <= end)
-                    a = 1f;
-                else
-                    a = (float)Math.Clamp(1 - (now - end) / fade, 0, 1);
-
-                targetAlpha = a;
-                Alpha = a;
-            }
-
-            // Hit-test against the path itself (not the bounding box) so only the line is grabbable/clickable.
-            public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
-                => (LayerEditable?.Invoke() ?? false) && targetAlpha > 0.05f && path.ReceivePositionalInputAt(screenSpacePos);
-
-            // Right-click deletes the stroke (left-click/drag is reserved for moving it, so moving is accident-free).
-            protected override bool OnMouseDown(MouseDownEvent e)
-            {
-                if (e.Button == osuTK.Input.MouseButton.Right && (LayerEditable?.Invoke() ?? false))
-                {
-                    OnDelete?.Invoke();
-                    return true;
-                }
-                return base.OnMouseDown(e);
-            }
-
-            protected override bool OnDragStart(DragStartEvent e)
-            {
-                if (e.Button != osuTK.Input.MouseButton.Left || !(LayerEditable?.Invoke() ?? false))
-                    return false;
-
-                dragGrab = ToLocalSpace(e.ScreenSpaceMouseDownPosition);
-                dragOriginal = (Vector2[])points.Clone();
-                OnMoveBegin?.Invoke(); // snapshot for undo before the move
-                return true;
-            }
-
-            protected override void OnDrag(DragEvent e)
-            {
-                Vector2 delta = ToLocalSpace(e.ScreenSpaceMousePosition) - dragGrab;
-                for (int i = 0; i < points.Length; i++)
-                    points[i] = dragOriginal[i] + delta;
-
-                forceRebuild = true;
-                setVertices(points.Length);
-            }
-
-            protected override void OnDragEnd(DragEndEvent e)
-            {
-                // Persist the moved points back to the model so the move survives save / undo snapshots.
-                var pts = new List<float[]>(points.Length);
-                foreach (var p in points)
-                    pts.Add(new[] { p.X, p.Y });
-                annotation.Points = pts;
-                OnMoved?.Invoke();
-            }
-        }
     }
 }
