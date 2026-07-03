@@ -55,6 +55,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             row(list, "Flow slow gap (ms)", 60, 340, () => HumanizeTuning.FlowSlowMs, v => HumanizeTuning.FlowSlowMs = v);
             row(list, "Straighten zig-zag", 0, 1, () => HumanizeTuning.StreamStraightenAmount, v => HumanizeTuning.StreamStraightenAmount = v);
             row(list, "Straighten threshold (r)", 0, 2, () => HumanizeTuning.StreamStraightenThreshold, v => HumanizeTuning.StreamStraightenThreshold = v);
+            row(list, "Straighten window (notes)", 1, 8, () => HumanizeTuning.StreamStraightenTaps, v => HumanizeTuning.StreamStraightenTaps = v);
+
+            group(list, "REACTION (dwell after a pause)");
+            row(list, "React short gap (ms)", 100, 500, () => HumanizeTuning.ReactionShortMs, v => HumanizeTuning.ReactionShortMs = v);
+            row(list, "React long gap (ms)", 300, 1000, () => HumanizeTuning.ReactionLongMs, v => HumanizeTuning.ReactionLongMs = v);
+            row(list, "Move time (ms)", 80, 500, () => HumanizeTuning.ReactionMoveMs, v => HumanizeTuning.ReactionMoveMs = v);
 
             group(list, "ARC (bow on jumps)");
             row(list, "Arc amount", 0, 0.6f, () => HumanizeTuning.ArcAmount, v => HumanizeTuning.ArcAmount = v);
@@ -74,11 +80,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             row(list, "Cut window", 0, 0.6f, () => HumanizeTuning.SliderCutWindow, v => HumanizeTuning.SliderCutWindow = v);
             row(list, "Laziness", 0, 1, () => HumanizeTuning.SliderLaziness, v => HumanizeTuning.SliderLaziness = v);
             row(list, "Edge fade (ms)", 0, 150, () => HumanizeTuning.SliderEdgeFadeMs, v => HumanizeTuning.SliderEdgeFadeMs = v);
+            row(list, "Follow wander (r)", 0, 1, () => HumanizeTuning.SliderFollowWander, v => HumanizeTuning.SliderFollowWander = v);
+            row(list, "Wander speed (Hz)", 0.2f, 4, () => HumanizeTuning.SliderWanderHz, v => HumanizeTuning.SliderWanderHz = v);
             row(list, "Kick slider max (ms)", 0, 200, () => HumanizeTuning.KickSliderMaxMs, v => HumanizeTuning.KickSliderMaxMs = v);
             row(list, "Flow release (momentum)", 0, 1, () => HumanizeTuning.SliderFlowRelease, v => HumanizeTuning.SliderFlowRelease = v);
             row(list, "Reverse laziness", 0, 1, () => HumanizeTuning.ReverseLaziness, v => HumanizeTuning.ReverseLaziness = v);
             row(list, "Release frac", 0, 0.3f, () => HumanizeTuning.SliderReleaseFrac, v => HumanizeTuning.SliderReleaseFrac = v);
             row(list, "Release max (ms)", 0, 100, () => HumanizeTuning.SliderReleaseMaxMs, v => HumanizeTuning.SliderReleaseMaxMs = v);
+            row(list, "Anticipation (to next)", 0, 1, () => HumanizeTuning.SliderAnticipation, v => HumanizeTuning.SliderAnticipation = v);
+            row(list, "Anticipation window (ms)", 0, 250, () => HumanizeTuning.SliderAnticipationMs, v => HumanizeTuning.SliderAnticipationMs = v);
+            row(list, "Anticip. align off (dot)", -1, 1, () => HumanizeTuning.AnticipationAlignLo, v => HumanizeTuning.AnticipationAlignLo = v);
+            row(list, "Anticip. align full (dot)", -1, 1, () => HumanizeTuning.AnticipationAlignHi, v => HumanizeTuning.AnticipationAlignHi = v);
+            row(list, "Follow leash (r)", 0.5f, 2.4f, () => HumanizeTuning.FollowCircleSafety, v => HumanizeTuning.FollowCircleSafety = v);
 
             InternalChild = new Container
             {

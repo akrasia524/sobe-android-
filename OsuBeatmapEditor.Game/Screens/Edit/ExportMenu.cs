@@ -19,6 +19,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
     {
         public Action? OnExportOsz;
         public Action? OnExportOsu;
+        public Action? OnExportVideo;
 
         private Container panel = null!;
 
@@ -61,6 +62,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                     () => Fire(OnExportOsz)),
                                 new Row(FontAwesome.Solid.FileAlt, "Export difficulty as .osu", "Just this difficulty's .osu",
                                     () => Fire(OnExportOsu)),
+                                new Row(FontAwesome.Solid.Film, "Export video...", "Render a clip to mp4 for Discord",
+                                    () => Fire(OnExportVideo)),
                             },
                         },
                     },

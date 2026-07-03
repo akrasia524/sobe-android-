@@ -174,6 +174,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// </summary>
         public readonly Bindable<string> SkinName = new Bindable<string>(string.Empty);
 
+        /// <summary>Destination folder for exported videos. Empty = the app's default <c>video-exports</c> storage folder.</summary>
+        public readonly Bindable<string> VideoExportFolder = new Bindable<string>(string.Empty);
+
         /// <summary>Review mode: the modder's display name, stamped on annotations they author.</summary>
         public readonly Bindable<string> ReviewAuthorName = new Bindable<string>(string.Empty);
 
@@ -265,6 +268,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 f.ValueChanged += _ => save();
             DefaultCreator.ValueChanged += _ => save();
             SkinName.ValueChanged += _ => save();
+            VideoExportFolder.ValueChanged += _ => save();
             ReviewAuthorName.ValueChanged += _ => save();
             ModdingMutedTypes.ValueChanged += _ => save();
             ShowBetaPopup.ValueChanged += _ => save();
@@ -316,6 +320,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 if (data.TryGetValue("skinName", out string? skin))
                     SkinName.Value = skin;
+
+                if (data.TryGetValue("videoExportFolder", out string? videoFolder))
+                    VideoExportFolder.Value = videoFolder;
 
                 if (data.TryGetValue("moddingMutedTypes", out string? muted))
                     ModdingMutedTypes.Value = muted;
@@ -411,6 +418,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     data["f_" + key] = bindable.Value.ToString();
                 data["defaultCreator"] = DefaultCreator.Value;
                 data["skinName"] = SkinName.Value;
+                data["videoExportFolder"] = VideoExportFolder.Value;
                 data["reviewAuthorName"] = ReviewAuthorName.Value;
                 data["moddingMutedTypes"] = ModdingMutedTypes.Value;
                 data["showBetaPopup"] = ShowBetaPopup.Value.ToString();

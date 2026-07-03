@@ -30,8 +30,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // nearly straight through it, following it only once its amplitude passes a threshold. A binomial smooth
         // (¼,½,¼) removes just the ALTERNATING component (so smooth curved streams are kept, only zig-zags flatten);
         // a soft-threshold on the removed part straightens up to the threshold and follows the excess. Streams only.
-        public static float StreamStraightenAmount = 0.29f;    // 0 = trace every wiggle, 1 = fully cut small zig-zags (user-tuned)
-        public static float StreamStraightenThreshold = 1.6f;  // zig-zag half-amplitude (× radius) below which it's straightened; above, followed (user-tuned)
+        public static float StreamStraightenAmount = 0.55f;    // 0 = trace every note, 1 = fully collapse the stream onto its mean line (user-tuned)
+        public static float StreamStraightenThreshold = 1.6f;  // deviation half-amplitude (× radius) below which it's straightened; above, followed (user-tuned)
+        // How many notes on EACH side the stream-straightening averages over. A wide window makes the cursor cut a
+        // smooth line THROUGH a whole run instead of only cancelling the highest-frequency note-to-note zig-zag, so a
+        // dense stream stops looking "snapped" note by note. The window auto-stops at a jump (flow breaks the chain).
+        public static float StreamStraightenTaps = 4f;
+
+        // ─── REACTION (dwell after a pause, then move late) ────────────────────────────────────────────────
+        // After a pause the player doesn't drift slowly toward the next note — they hold position and only move once
+        // they've reacted to the upcoming circle, arriving right on time. So on a long gap the cursor DWELLS near the
+        // previous spot, then makes the whole move over the last ReactionMoveMs (arriving settled). Short gaps (streams,
+        // close jumps) keep flowing with no delay. React ramps in between ReactionShortMs (none) and ReactionLongMs (full).
+        public static float ReactionShortMs = 260f;   // gaps THIS short or less: no reaction delay (flow straight through)
+        public static float ReactionLongMs = 560f;    // gaps THIS long or more: full reaction delay (dwell, then move late)
+        public static float ReactionMoveMs = 260f;    // how long the actual move to the next circle takes; the rest of the gap is dwell
 
         // ─── ARC (lateral bow on jumps — the main "human vs robot" trait) ───────────────────────────────────
         // Replay analysis: real cursors bow OFF the straight line between two objects by 6-21% of the jump (more on
@@ -60,6 +73,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public static float SliderCutWindow = 0.4f;      // averaging half-window as a fraction of the slider duration (bigger = more corner cut) (user-tuned)
         public static float SliderLaziness = 0.76f;       // overall blend: 0 = trace the path exactly, 1 = full cut (user-tuned)
         public static float SliderEdgeFadeMs = 72f;       // keep the head/tail on-path over this many ms (those are actually hit) (user-tuned)
+        // Organic wander: a real hand doesn't sit dead-on the ball — it loosely snakes a little to each side of the
+        // path. Without this, straight sliders trace a perfect (robotic) line and curves become a clean averaged arc.
+        // A slow, low-frequency lateral drift (× radius) breaks that up. Bounded by FollowCircleSafety, so it can never
+        // wander far enough to drop a tick. 0 = dead-on the lazy path.
+        public static float SliderFollowWander = 0.2f;     // 2D drift amplitude as a fraction of the radius
+        public static float SliderWanderHz = 0.85f;        // how fast the wander oscillates (cycles per slider-second)
         // A "kick slider" (1/4, 1/8, ...) is so short it's played like a circle — the player just taps the head and
         // moves on instead of tracing it. Sliders at or under this duration release at the head (stream like circles).
         public static float KickSliderMaxMs = 80f;
@@ -71,6 +90,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public static float ReverseLaziness = 0.6f;
         public static float SliderReleaseFrac = 0.012f;  // let go this fraction of the slider early (replay median ~1%)..
         public static float SliderReleaseMaxMs = 8f;     // ..capped at this many ms
+        // Anticipation ("path of least effort" leaving a slider): approaching the release the player already drifts the
+        // cursor toward the NEXT object instead of tracing the tail then jumping. Blend the follow target toward the
+        // next head over the last AnticipationMs, up to AnticipationAmount. Clamped by FollowCircleSafety so ticks are
+        // never lost — the cursor may lead toward the exit but stays inside the follow circle of the actual ball.
+        public static float SliderAnticipation = 0.35f;    // 0 = trace the tail fully, 1 = pull the follow this fraction of the way toward the next head by release
+        public static float SliderAnticipationMs = 110f;   // how long before release the drift-toward-next begins
+        // Anticipation only makes sense when the NEXT note is "downstream" of the slider's exit flow (you drift toward
+        // where you're already heading). If it's back the way the slider came, don't pre-empt — follow to the end then
+        // turn. Gate = smoothstep(dot(exitDir, toNextDir), Lo, Hi): ≤Lo (opposite) none, ≥Hi (ahead) full anticipation.
+        public static float AnticipationAlignLo = -0.15f;  // alignment (dot) at/below which anticipation is fully off
+        public static float AnticipationAlignHi = 0.55f;   // alignment (dot) at/above which anticipation is fully on
+        // Safety leash on the lazy CURVATURE CUT only (not the exit anticipation): the corner-cutting follow may never
+        // stray further than this many object-radii from the real ball, so a sharp curve / reverse can't drop a tick.
+        // osu!'s follow circle is ~2.4r; stay a bit inside it. The exit toward the next note rides on top, unleashed.
+        public static float FollowCircleSafety = 1.9f;
 
         // ─── defaults snapshot (for the live panel's "Reset") ──────────────────────────────────────────────
         // Captured once, before any tweak, via reflection over the public static float fields above.

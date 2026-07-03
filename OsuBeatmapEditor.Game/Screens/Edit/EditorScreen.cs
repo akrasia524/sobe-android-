@@ -318,6 +318,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private GameHost host = null!;
         private ITrackStore? trackStore;
         private Track? track;
+        // Full path to the map's song file on disk (resolved in loadTrack); the video exporter muxes a slice of it.
+        private string? audioFilePath;
         private InterpolatingFramedClock? audioClock;
 
         // Visuals (playhead, objects, timelines) read this offset clock instead of the raw audio clock: while
@@ -849,6 +851,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 {
                     OnExportOsz = exportMap,
                     OnExportOsu = exportDifficultyOsu,
+                    OnExportVideo = openVideoExportPanel,
                 },
                 timingPillPopover = new TimingPillPopover
                 {
@@ -882,6 +885,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             playfield.TimeSource = () => VisualTime;
             playfield.SnappedTimeSource = () => snapTime(CurrentTime);
             playfield.PlacementSnap = SnapPlacement;
+
+            setupVideoExportPanel();
             playfield.SpacingGuideResolver = ResolveSpacingGuide;
             playfield.SliderTickDistance = sliderTickDistance;
 
@@ -1836,7 +1841,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// user's audio offset while playing, so what's on screen matches what's heard through a laggy output. Equals
         /// <see cref="CurrentTime"/> while paused (no offset), so it never moves where placed objects land.
         /// </summary>
-        private double VisualTime => visualClock?.CurrentTime ?? CurrentTime;
+        private double VisualTime => capturing ? captureTimeMs : (visualClock?.CurrentTime ?? CurrentTime);
 
         /// <summary>
         /// Advances the raw audio clock and the offset visual clock (one per frame, and after a seek). The offset
@@ -1856,6 +1861,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         protected override void Update()
         {
             base.Update();
+
+            // While rendering a video, drive the scene from the manual capture clock and skip all live editor
+            // bookkeeping (hitsounds, playback throttle, tool state) - the exporter owns the frame timing.
+            if (capturing)
+            {
+                tickCaptureClock();
+                return;
+            }
+
             updateHitsoundLayout();
             updatePlaybackThrottle();
             // Advance the clocks once per frame, before children read CurrentTime / VisualTime.
@@ -5938,6 +5952,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             string? audioPath = LazerFileStore.ResolvePath(set.DataDirectory, hash);
             if (audioPath == null)
                 return null;
+
+            audioFilePath = audioPath;
 
             var storage = new NativeStorage(Path.GetDirectoryName(audioPath)!, host);
             trackStore = audio.GetTrackStore(new StorageBackedResourceStore(storage));

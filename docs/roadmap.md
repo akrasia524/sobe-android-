@@ -1,7 +1,7 @@
 # Roadmap de sobe
 
 Editor de beatmaps para osu!
-Version actual: v0.9.67-beta
+Version actual: v0.9.68-beta
 
 Lo marcado con check esta hecho. Lo que falta lleva el porcentaje completado.
 
@@ -25,6 +25,17 @@ Lo marcado con check esta hecho. Lo que falta lleva el porcentaje completado.
 - ✓ Guias de distancia y deteccion de blankets al colocar objetos (manteniendo Shift)
 
 ## En desarrollo
+
+### Exportar video - 85%
+Renderiza un trozo del mapa a un .mp4 desde el editor, para compartirlo (por ejemplo en Discord).
+- ✓ Render de gameplay limpio (sin interfaz del editor) con fondo, objetos y cursor Auto, determinista (sin tirones)
+- ✓ Rango inicio/fin con duracion en vivo y estimacion del peso final
+- ✓ Presets de calidad y de tamano; el de Discord ajusta el bitrate para caber siempre bajo el limite (10 MB)
+- ✓ Hitsounds mezclados en su tiempo exacto (samples del mapa o de la skin activa)
+- ✓ Mods de render: HR, EZ, HD, DT y NC (con audio acelerado para DT/NC)
+- ✓ Carpeta de destino configurable y persistente
+- Empaquetar ffmpeg con la app (ahora hace falta tenerlo instalado en el sistema)
+- Render en segundo plano para poder seguir mapeando mientras se exporta
 
 ### Soporte de skins (.osk) - 75%
 Mapea con tu propia skin de osu!: las texturas y hitsounds del skin reemplazan el dibujo por defecto.

@@ -367,6 +367,61 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Toggles the Auto-mod preview cursor (visual only).</summary>
         public void SetAutoPlay(bool enabled) => modAuto = enabled;
 
+        /// <summary>Whether the Auto-mod preview cursor is currently on (so the video exporter can save/restore it).</summary>
+        public bool AutoPlayEnabled => modAuto;
+
+        // Saved alphas of the editor-chrome layers while presentation mode hides them, so exiting restores exactly.
+        private readonly System.Collections.Generic.Dictionary<Drawable, float> presentationSavedAlpha = new System.Collections.Generic.Dictionary<Drawable, float>();
+
+        // While true (video export), the play area shrinks to osu!'s gameplay 0.8 fit so edge objects aren't clipped.
+        private bool presentationMode;
+        private const float presentation_scale = 0.8f;
+
+        // In presentation mode objects fade out fast (like being hit in real gameplay) instead of the editor's
+        // slower, authoring-friendly fade. Circles/ends vanish shortly after their hit time.
+        private const double presentation_fade_out = 240;
+
+        /// <summary>Object fade-out duration: a quick gameplay-like fade while rendering a video, else the editor setting.</summary>
+        private double effectiveFadeOut => presentationMode ? presentation_fade_out : settings.ObjectFadeOut.Value;
+
+        /// <summary>
+        /// Hides every editor-only layer (grid, border, selection/annotation highlights, placement previews, angle
+        /// indicators) so only the background + hit objects + Auto cursor remain - a clean gameplay view for the video
+        /// exporter. Alphas are saved on entry and restored on exit, so it round-trips regardless of prior state.
+        /// </summary>
+        public void SetPresentationMode(bool on)
+        {
+            presentationMode = on;
+
+            Drawable[] chrome =
+            {
+                gridContainer, playfieldBorder, selectionLayer, overlayLayer,
+                annotationLayer, annotationHighlightLayer, modifiedHighlightLayer, angleContainer,
+            };
+
+            if (on)
+            {
+                presentationSavedAlpha.Clear();
+                foreach (var d in chrome)
+                {
+                    presentationSavedAlpha[d] = d.Alpha;
+                    d.Alpha = 0;
+                }
+            }
+            else
+            {
+                foreach (var d in chrome)
+                {
+                    if (presentationSavedAlpha.TryGetValue(d, out float saved))
+                        d.Alpha = saved;
+                }
+                presentationSavedAlpha.Clear();
+            }
+
+            // Rebuild so the objects pick up the presentation fade-out (fast, gameplay-like) or revert to the editor's.
+            rebuildAppearance();
+        }
+
         /// <summary>Sets the Auto cursor colour.</summary>
         public void SetAutoColour(Color4 colour) => autoCursor.SetColour(colour);
 
@@ -502,9 +557,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // brief "amago" then off to the next); an isolated/slow slider is followed almost to the end.
             double curEnd = modHumanize ? sliderReleaseTime(objs, prev) : autoEndTime(cur);
 
-            // Inside the current object (a long slider / spinner): follow it.
+            // Inside the current object (a long slider / spinner): follow it. Leaving a slider toward a next note, the
+            // follow already anticipates — drifting toward that note before the tail (path of least effort), but only
+            // when that note is downstream of the exit flow (see sliderAnticipation).
+            var (followAnticipate, anticipateStrength) = sliderAnticipation(objs, prev, curEnd);
             if (time <= curEnd)
-                return autoFollowPos(cur, time);
+            {
+                // A circle — or a kick slider, which is played AS a circle at its head (sliderExit is false, so both
+                // surrounding gaps take their endpoint from nodeClean) — is a single instant here. Return the SAME
+                // spline knot those gaps use (nodeClean, which straightens a stream note), not the raw head, or this one
+                // frame flicks to the un-straightened position and back = a teleport at every such note in a stream.
+                // Only a real, followed slider (sliderExit) or a spinner falls through to the actual follow.
+                if (modHumanize && (cur.Kind == HitObjectKind.Circle || isKickSlider(cur)))
+                    return nodeClean(objs, prev) + aimError(cur);
+                return autoFollowPos(cur, time, followAnticipate, curEnd, anticipateStrength);
+            }
 
             // After the last object: rest where it ended.
             if (prev + 1 >= objs.Count)
@@ -520,7 +587,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Leave WITH slider momentum only if the cursor actually followed the slider for a bit; if it released right
             // at the head (a kick / very high momentum) there's no follow to carry out, so flow on like a circle.
             bool sliderExit = modHumanize && cur.Kind == HitObjectKind.Slider && (curEnd - cur.StartTime) > 8.0;
-            Vector2 a = sliderExit ? autoFollowPos(cur, curEnd) : autoEndPos(cur);
+            // The exit point is the anticipated follow at release (already leaning toward next), matching the follow
+            // branch above at time == curEnd so the handoff into the gap is continuous.
+            Vector2 a = sliderExit ? autoFollowPos(cur, curEnd, followAnticipate, curEnd, anticipateStrength) : autoEndPos(cur);
             Vector2 b = autoStartPos(next);
             double f = Math.Clamp((time - from) / (to - from), 0, 1);
 
@@ -528,9 +597,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // only on very large jumps. Otherwise the perfect Auto easing (smoothstep) along a straight line.
             if (modHumanize)
             {
-                // Leaving a slider, the "before" tangent points along the slider so the cursor carries its momentum out.
-                Vector2 sliderBefore = sliderExit ? autoFollowPos(cur, Math.Max(cur.StartTime, curEnd - 24)) : a;
-                return humanGapPosition(objs, prev, sliderExit, a, b, sliderBefore, f, to - from);
+                // Carry the cursor's ACTUAL exit velocity into the gap (measured off the follow over the last few ms,
+                // including any anticipation drift) so there's no velocity jump — the slider→gap handoff is C1, no tug.
+                const double h = 12.0;
+                Vector2 exitBack = sliderExit ? autoFollowPos(cur, Math.Max(cur.StartTime, curEnd - h), followAnticipate, curEnd, anticipateStrength) : a;
+                Vector2 exitVel = sliderExit ? (a - exitBack) / (float)Math.Min(h, curEnd - cur.StartTime + 1e-3) : Vector2.Zero;
+                return humanGapPosition(objs, prev, sliderExit, a, b, exitVel, f, to - from);
             }
 
             f = f * f * (3 - 2 * f); // smoothstep
@@ -564,6 +636,33 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         }
 
         /// <summary>
+        /// The "path of least effort" lead when leaving a slider: the head to drift the follow toward (the next object)
+        /// and how strongly. Anticipation only fires when the next note is DOWNSTREAM of the slider's exit flow — the
+        /// player already heads where they're going. If it's back the way the slider came, the strength gates to 0 and
+        /// the cursor follows to the end, then turns. Returns (null, 0) when there's nothing to anticipate.
+        /// </summary>
+        private (Vector2? head, float strength) sliderAnticipation(IReadOnlyList<HitObjectModel> objs, int prev, double curEnd)
+        {
+            var cur = objs[prev];
+            if (!modHumanize || cur.Kind != HitObjectKind.Slider || prev + 1 >= objs.Count || HumanizeTuning.SliderAnticipation <= 0.001f)
+                return (null, 0f);
+
+            Vector2 head = autoStartPos(objs[prev + 1]);
+
+            // Pure slider exit direction (the geometric tangent at release, no anticipation) = the "flow" of the slider.
+            const double h = 12.0;
+            Vector2 exit = autoFollowPos(cur, curEnd);
+            Vector2 exitPrev = autoFollowPos(cur, Math.Max(cur.StartTime, curEnd - h));
+            Vector2 exitDir = safeNormalize(exit - exitPrev);
+            Vector2 toNext = safeNormalize(head - exit);
+
+            float align = Vector2.Dot(exitDir, toNext); // 1 = next is straight ahead of the exit, -1 = straight behind
+            float gate = smoothstep(align, HumanizeTuning.AnticipationAlignLo, HumanizeTuning.AnticipationAlignHi);
+            float strength = HumanizeTuning.SliderAnticipation * gate;
+            return strength > 0.001f ? (head, strength) : (null, 0f);
+        }
+
+        /// <summary>
         /// A "human" glide from exit point <paramref name="a"/> (time tA) to the next object's head <paramref name="b"/>
         /// (time tB) over linear progress <paramref name="f"/>. This is one segment of a cubic Hermite spline laid
         /// through the hit objects in TIME: each object's velocity is its Catmull-Rom tangent scaled by a flow factor
@@ -574,7 +673,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// Stacks fall out for free (a near-zero-length gap barely moves) and rotational patterns arc naturally from
         /// the tangents (no turn / figure-of-eight logic). A subtle, gated overshoot is the only added flourish.
         /// </summary>
-        private Vector2 humanGapPosition(IReadOnlyList<HitObjectModel> objs, int prev, bool sliderExit, Vector2 a, Vector2 b, Vector2 sliderBefore, double f, double gapMs)
+        private Vector2 humanGapPosition(IReadOnlyList<HitObjectModel> objs, int prev, bool sliderExit, Vector2 a, Vector2 b, Vector2 sliderExitVel, double f, double gapMs)
         {
             // Stream "path of least effort": pull each endpoint onto the straightened (zig-zag-free) note centre while
             // keeping its aim-error offset, so the cursor cuts nearly straight through a small stream zig-zag instead of
@@ -586,14 +685,38 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             float dt = (float)Math.Max(1, gapMs);
             float s = (float)Math.Clamp(f, 0, 1);
+            float chord = (b - a).Length;
+
+            // Reaction delay: after a PAUSE a real player doesn't drift the whole gap — they hold position and only move
+            // once they've reacted to the upcoming circle, then cover the distance late and arrive on time. So on a long
+            // gap remap progress to DWELL near A, then make the move over the last ReactionMoveMs (smoothstep, arriving
+            // settled). Short gaps (streams / close jumps) get react≈0 and flow through unchanged. Still a pure function
+            // of time and continuous in f, so C1 / no-teleport holds. vA/vB are already small on these low-flow gaps (the
+            // slider-exit cap shrinks with gap length), so freezing the start doesn't fight any real exit momentum.
+            float react = smoothstep((float)gapMs, HumanizeTuning.ReactionShortMs, HumanizeTuning.ReactionLongMs);
+            if (react > 0.001f)
+            {
+                float moveFrac = Math.Clamp((float)(HumanizeTuning.ReactionMoveMs / Math.Max(1.0, gapMs)), 0.05f, 1f);
+                float dwellEnd = 1f - moveFrac;
+                float moved = s <= dwellEnd ? 0f : smoothstep((s - dwellEnd) / moveFrac, 0f, 1f);
+                s = s + react * (moved - s); // lerp(s, moved, react)
+            }
 
             // Velocity (osu!px/ms) at each end of the gap. vB is the next head's Catmull-Rom tangent scaled by its flow
-            // factor; vA is the previous object's — except leaving a slider, where we instead carry the slider's own
-            // exit direction so the cursor flows out of the curve with its momentum.
+            // factor; vA is the previous object's — except leaving a slider, where we carry the cursor's ACTUAL exit
+            // velocity (measured off the follow itself, sliderExitVel) so the gap continues with no velocity jump — the
+            // handoff is C1 and there's no tug. Capped so a very fast slider into a long gap can't fling the Hermite
+            // past the next note (a bounded magnitude discontinuity only in that pathological case).
             Vector2 vB = knotVel(objs, prev + 1);
-            Vector2 vA = sliderExit
-                ? safeNormalize(a - sliderBefore) * ((b - a).Length / dt) * slider_exit_momentum
-                : knotVel(objs, prev);
+            Vector2 vA;
+            if (sliderExit)
+            {
+                float cap = slider_exit_speed_cap * chord / dt;
+                float sp = sliderExitVel.Length;
+                vA = sp > cap && sp > 1e-4f ? sliderExitVel * (cap / sp) : sliderExitVel;
+            }
+            else
+                vA = knotVel(objs, prev);
 
             // Cubic Hermite through A,B with those velocities (Hermite tangents = velocity × Δt). With small tangents
             // this is exactly a smoothstep (ease-in/out, the cursor settles); with full tangents it sweeps straight through.
@@ -608,7 +731,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // and s=1, so they never disturb the shared knot velocity — the no-teleport (C1) guarantee still holds. ---
             float radius = currentDiameter * 0.5f;
             float scaling = radius > 0.01f ? 50f / radius : 1f;   // osu!'s normalised_radius = 50 (diameter = 100)
-            float chordLen = (b - a).Length;
+            float chordLen = chord;
             float dNorm = chordLen * scaling;
             float gapFlow = shortness(gapMs);                     // 1 = a fast (stream) gap, 0 = a slow (jump) gap
 
@@ -650,8 +773,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             return pos;
         }
 
-        /// <summary>Momentum the cursor carries out of a slider, as a fraction of the straight-line speed to the next note.</summary>
-        private const float slider_exit_momentum = 0.6f;
+        /// <summary>Upper bound on the cursor's slider-exit speed, as a multiple of the straight-line speed to the next
+        /// note, so a fast slider into a long gap can't fling the Hermite past the target. Below the cap the real exit
+        /// velocity is carried through unchanged (C1 handoff, no tug).</summary>
+        private const float slider_exit_speed_cap = 1.8f;
 
         /// <summary>An object's head position WITHOUT aim error, clamped so callers may index past the ends. Used for the
         /// tangent finite-differences so a note's random aim offset can't make a stream weave (the gap endpoints A/B
@@ -676,13 +801,46 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (fl < 0.01f || HumanizeTuning.StreamStraightenAmount < 0.001f)
                 return center;
 
-            Vector2 smoothed = cleanHead(objs, k - 1) * 0.25f + center * 0.5f + cleanHead(objs, k + 1) * 0.25f;
-            Vector2 removed = center - smoothed;          // the alternating (zig-zag) component; ~0 for a smooth curve
+            // A φ-continuity-weighted moving average over up to StreamStraightenTaps notes on each side. Each neighbour's
+            // weight is the running product of the gap-shortness along the chain to it (× a Gaussian taper), so the
+            // window naturally spans a whole stream and CUTS OFF at a jump (a slow gap zeroes the chain). Averaging over
+            // many notes — not just the 3-tap alternating component — collapses the stream onto its smooth mean line, so
+            // the cursor slides through it instead of visibly hitting every note; a gentle curve is preserved (low freq).
+            int taps = Math.Max(1, (int)MathF.Round(HumanizeTuning.StreamStraightenTaps));
+            Vector2 sum = center;
+            float wsum = 1f;
+            for (int dir = -1; dir <= 1; dir += 2)
+            {
+                float chain = 1f;
+                for (int i = 1; i <= taps; i++)
+                {
+                    int a = k + dir * (i - 1), b = k + dir * i;      // consecutive pair along the run
+                    chain *= shortness(gapBetween(objs, a, b));      // continuity of the stream out to this note
+                    if (chain < 0.02f)
+                        break;                                        // a jump broke the chain: stop the window here
+                    float taper = MathF.Exp(-(i * i) / (float)(2 * taps * taps));
+                    float w = chain * taper;
+                    sum += cleanHead(objs, b) * w;
+                    wsum += w;
+                }
+            }
+            Vector2 smoothed = sum / wsum;
+
+            Vector2 removed = center - smoothed;          // what the straightening would remove; small on a smooth run
             float thr = HumanizeTuning.StreamStraightenThreshold * currentDiameter * 0.5f;
             float len = removed.Length;
-            float keep = len > thr ? (len - thr) / len : 0f; // straighten up to the threshold, follow the excess
+            float keep = len > thr ? (len - thr) / len : 0f; // straighten up to the threshold, follow a large deliberate deviation
             Vector2 target = smoothed + removed * keep;
             return Vector2.Lerp(center, target, fl * HumanizeTuning.StreamStraightenAmount);
+        }
+
+        /// <summary>Time gap (ms) between two objects by index, clamped to the ends; <see cref="double.PositiveInfinity"/>
+        /// past an end so the flow chain treats the map boundary as a jump.</summary>
+        private static double gapBetween(IReadOnlyList<HitObjectModel> objs, int i, int j)
+        {
+            if (i < 0 || j < 0 || i >= objs.Count || j >= objs.Count)
+                return double.PositiveInfinity;
+            return Math.Abs(objs[j].StartTime - objs[i].StartTime);
         }
 
         /// <summary>Catmull-Rom tangent (osu!px/ms) at object <paramref name="k"/> — the time-correct secant through its
@@ -780,8 +938,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private const double auto_spin_speed = 0.025;
         private const float auto_spin_radius = 55f;
 
+        /// <summary>The spinning cursor position at <paramref name="time"/> on a spinner (centre + a rotating offset).
+        /// The single source of truth so a spinner's aim endpoints (start/end pos) match what the follow actually does
+        /// at those instants — otherwise the gap would aim at the bare centre while the follow sits 55px out, teleporting
+        /// at each spinner boundary.</summary>
+        private static Vector2 spinnerPosAt(HitObjectModel o, double time)
+        {
+            var centre = new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH / 2f, ParsedBeatmap.PLAYFIELD_HEIGHT / 2f);
+            double ang = (time - o.StartTime) * auto_spin_speed;
+            return centre + new Vector2((float)Math.Cos(ang), (float)Math.Sin(ang)) * auto_spin_radius;
+        }
+
         private Vector2 autoStartPos(HitObjectModel o)
-            => new Vector2(o.X, o.Y) + DrawableHitObject.StackOffsetFor(o.StackHeight, currentDiameter) + aimError(o);
+            => o.Kind == HitObjectKind.Spinner
+                ? spinnerPosAt(o, o.StartTime) // where the spin actually begins (centre + radius on +X), not the bare centre
+                : new Vector2(o.X, o.Y) + DrawableHitObject.StackOffsetFor(o.StackHeight, currentDiameter) + aimError(o);
 
         private Vector2 autoEndPos(HitObjectModel o)
         {
@@ -796,7 +967,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     return (o.Slides % 2 == 0 ? path[0] : path[^1]) + stack;
 
                 case HitObjectKind.Spinner:
-                    return new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH / 2, ParsedBeatmap.PLAYFIELD_HEIGHT / 2);
+                    return spinnerPosAt(o, autoEndTime(o)); // where the spin actually ends, matching the follow (no teleport)
 
                 default:
                     return new Vector2(o.X, o.Y) + stack + aimError(o);
@@ -805,7 +976,27 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private double autoEndTime(HitObjectModel o) => o.StartTime + Math.Max(0, o.Duration);
 
-        private Vector2 autoFollowPos(HitObjectModel o, double time)
+        /// <summary>Keeps <paramref name="want"/> within the follow circle (FollowCircleSafety × object radius) of the
+        /// real ball position <paramref name="ball"/>, so laziness/anticipation can never drift far enough to drop a
+        /// slider tick. Returns the point on the leash if the request is outside it, else the request unchanged.</summary>
+        private Vector2 clampToFollowCircle(Vector2 want, Vector2 ball)
+        {
+            float maxOff = currentDiameter * 0.5f * HumanizeTuning.FollowCircleSafety;
+            Vector2 d = want - ball;
+            float l = d.Length;
+            return l > maxOff && l > 1e-4f ? ball + d * (maxOff / l) : want;
+        }
+
+        /// <param name="o">The object being followed.</param>
+        /// <param name="time">The current playback time (ms).</param>
+        /// <param name="releaseTime">The time the slider is released (ms); anticipation ramps over the window before it.</param>
+        /// <param name="anticipateTo">When set (humanising, leaving a slider toward a next object), the follow target
+        /// drifts toward this point over the last <see cref="HumanizeTuning.SliderAnticipationMs"/> before
+        /// <paramref name="releaseTime"/> — the "path of least effort" where the player already heads to the next note
+        /// before the tail. The drift is leashed to the follow circle so a tick is never missed.</param>
+        /// <param name="anticipateStrength">How strongly to drift toward <paramref name="anticipateTo"/> (0 = not at
+        /// all). Already includes the directional gate — only leads when the next note is downstream of the exit flow.</param>
+        private Vector2 autoFollowPos(HitObjectModel o, double time, Vector2? anticipateTo = null, double releaseTime = double.MaxValue, float anticipateStrength = 0f)
         {
             Vector2 stack = DrawableHitObject.StackOffsetFor(o.StackHeight, currentDiameter);
 
@@ -845,15 +1036,44 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     // Keep the very head and tail on-path (those are actually hit); cut freely through the middle and
                     // across repeats. Fades the cut over the first/last SliderEdgeFadeMs only (not at every repeat).
                     float edge = (float)Math.Clamp(Math.Min(elapsed, dur - elapsed) / Math.Max(1.0, HumanizeTuning.SliderEdgeFadeMs), 0, 1);
-                    return Vector2.Lerp(exact, avg, HumanizeTuning.SliderLaziness * edge);
+                    Vector2 lazy = Vector2.Lerp(exact, avg, HumanizeTuning.SliderLaziness * edge);
+
+                    // Organic wander: a loose hand snakes a little to each side of the path instead of tracing it dead-on
+                    // (so a straight slider isn't a perfect line and a curve isn't a clean averaged arc). A slow, low-freq
+                    // lateral drift off the local ball tangent; faded at the head/tail (same edge) so those stay on-path.
+                    if (HumanizeTuning.SliderFollowWander > 0.001f && edge > 0.001f)
+                        lazy += sliderWander(o, elapsed, dur) * edge;
+
+                    // Safety leash — but ONLY on the lazy curvature-cut, not on the exit. The leash exists so cutting a
+                    // sharp corner / reverse can't drift far enough to drop a tick; that's a property of the follow, so
+                    // clamp it to the real ball HERE, before anticipation. Anticipation (below) is the intentional exit
+                    // toward the next note and must NOT be leashed — otherwise the cursor pins to the follow-circle edge
+                    // "trying to leave but held back" until the gap yanks it free.
+                    lazy = clampToFollowCircle(lazy, exact);
+
+                    // Anticipation: approaching the release the cursor already drifts toward the next object instead of
+                    // tracing the tail then jumping (least effort). Strength is gated by the caller so it only leads when
+                    // the next note is downstream of the exit flow. Rides on top of the leashed follow, unclamped.
+                    // The ramp is EASE-IN (u², not smoothstep): velocity grows monotonically toward release and hands
+                    // off to the gap, instead of a smoothstep's mid-window peak-then-settle that reads as a lurch/sudden
+                    // acceleration out of the slider. So leaving is one smooth speed-up into the gap.
+                    if (anticipateTo is Vector2 nextHead && anticipateStrength > 0.001f && releaseTime < double.MaxValue)
+                    {
+                        // Clamp the window to the slider's OWN start: on a slider shorter than SliderAnticipationMs the
+                        // window would otherwise reach before the head, making the follow start with a non-zero drift at
+                        // StartTime — but the gap feeding INTO this slider aims at autoStartPos with NO drift, so the two
+                        // wouldn't meet at the head → a teleport. Anchoring u=0 at StartTime keeps that boundary exact.
+                        double winStart = Math.Max(o.StartTime, releaseTime - HumanizeTuning.SliderAnticipationMs);
+                        double winLen = Math.Max(1.0, releaseTime - winStart);
+                        float u = Math.Clamp((float)((time - winStart) / winLen), 0f, 1f);
+                        lazy = Vector2.Lerp(lazy, nextHead, u * u * anticipateStrength);
+                    }
+
+                    return lazy;
                 }
 
                 case HitObjectKind.Spinner:
-                {
-                    var centre = new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH / 2, ParsedBeatmap.PLAYFIELD_HEIGHT / 2);
-                    double ang = (time - o.StartTime) * auto_spin_speed;
-                    return centre + new Vector2((float)Math.Cos(ang), (float)Math.Sin(ang)) * auto_spin_radius;
-                }
+                    return spinnerPosAt(o, time);
 
                 default:
                     return new Vector2(o.X, o.Y) + stack + aimError(o);
@@ -878,6 +1098,23 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             double frac = span % 2 == 0 ? within : 1 - within; // bounce back on each repeat
             return SliderGeometry.PointAtFraction(path, Math.Clamp(frac, 0, 1))
                    + DrawableHitObject.StackOffsetFor(o.StackHeight, currentDiameter);
+        }
+
+        /// <summary>
+        /// A slow, low-frequency 2D drift (osu!px) so the humanised slider follow reads as a loose hand rather than a
+        /// perfect trace — a straight slider stops being a dead-straight line and a curve stops being a clean averaged
+        /// arc. Deliberately an ABSOLUTE-space drift (not perpendicular to the ball tangent): a tangent-relative wander
+        /// flips sign at a reverse's turn-around and made the cursor jitter wildly there. This is smooth everywhere.
+        /// Stable per object; the caller fades it at the head/tail and the follow-circle leash bounds it, so it can
+        /// never drift far enough to drop a tick.
+        /// </summary>
+        private Vector2 sliderWander(HitObjectModel o, double elapsed, double dur)
+        {
+            double phase = (o.Id % 97) * 0.646; // a stable per-object phase so two sliders don't wander in lockstep
+            double w = 2 * Math.PI * HumanizeTuning.SliderWanderHz * (elapsed / 1000.0);
+            float x = (float)(Math.Sin(w + phase) * 0.7 + Math.Sin(w * 1.9 + phase * 1.3) * 0.3);
+            float y = (float)(Math.Cos(w * 1.15 + phase * 0.7) * 0.7 + Math.Sin(w * 2.3 + phase) * 0.3);
+            return new Vector2(x, y) * (currentDiameter * 0.5f * HumanizeTuning.SliderFollowWander);
         }
 
         /// <summary>Rebuilds every hit-object drawable so appearance-setting changes take effect immediately.</summary>
@@ -936,7 +1173,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Match what's actually drawn (and what selection treats as hittable): the approach window
             // plus the configurable fade-out tail, so a passed object stays snappable while it lingers.
             double end = o.StartTime + (o.Kind is HitObjectKind.Slider or HitObjectKind.Spinner ? o.Duration : 0);
-            return t >= o.StartTime - lastPreempt && t <= end + settings.ObjectFadeOut.Value;
+            return t >= o.StartTime - lastPreempt && t <= end + effectiveFadeOut;
         }
 
         /// <summary>
@@ -1576,7 +1813,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 double tick = o.Kind == HitObjectKind.Slider ? SliderTickDistance?.Invoke(o) ?? 0 : 0;
                 Color4? author = AuthorColourProvider?.Invoke(o);
-                var drawable = new DrawableHitObject(o, circleDiameter, preempt, settings.ObjectFadeOut.Value, tick, modHidden, modHardRock, author);
+                var drawable = new DrawableHitObject(o, circleDiameter, preempt, effectiveFadeOut, tick, modHidden, modHardRock, author);
                 drawableMap[o.Id] = drawable;
                 modelMap[o.Id] = o;
                 hitObjectContainer.Add(drawable);
@@ -2031,7 +2268,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 float angleDeg = MathHelper.RadiansToDegrees(MathF.Acos(dot));
 
                 double lifeStart = cur.StartTime - lastPreempt;
-                double lifeEnd = endTime(cur) + settings.ObjectFadeOut.Value;
+                double lifeEnd = endTime(cur) + effectiveFadeOut;
                 angleContainer.Add(new DrawableAngle(vertex, dirIn, dirOut, angleDeg, lifeStart, lifeEnd));
             }
         }
@@ -2060,9 +2297,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Size = Vector2.One, dropping gameplay's 0.8 shrink). The smaller of width/height binds, keeping
             // the 4:3 aspect; this is a fixed scale independent of circle size.
             // A hair under full-fit so there's a slight breathing margin from the top/bottom timelines.
+            // In presentation mode (video export) we DON'T want the editor's near-full fit: reinstate gameplay's
+            // 0.8 shrink so objects and their approach circles near the playfield edges aren't clipped by the frame.
+            float fitFactor = presentationMode ? presentation_scale : 0.97f;
             float scale = Math.Min(
                 DrawWidth / ParsedBeatmap.PLAYFIELD_WIDTH,
-                DrawHeight / ParsedBeatmap.PLAYFIELD_HEIGHT) * 0.97f;
+                DrawHeight / ParsedBeatmap.PLAYFIELD_HEIGHT) * fitFactor;
 
             // HardRock flips the play area vertically about its centre (y' = 384 - y), exactly like osu!'s HR.
             // Flipping the whole container keeps input (ToLocalSpace), overlays and selection consistent for
