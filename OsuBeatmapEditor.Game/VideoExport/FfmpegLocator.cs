@@ -11,7 +11,8 @@ namespace OsuBeatmapEditor.Game.VideoExport
     /// <item>a copy bundled next to the app (<c>&lt;basedir&gt;/ffmpeg/ffmpeg[.exe]</c>), the shipping path;</item>
     /// <item>the bare name <c>ffmpeg</c>, relying on it being on the system PATH.</item>
     /// </list>
-    /// Until the per-platform binaries are bundled (Phase 4), install ffmpeg locally to test - e.g. <c>brew install ffmpeg</c>.
+    /// Release builds bundle a static ffmpeg at <c>&lt;appdir&gt;/ffmpeg/</c> (see the release workflow). For local dev
+    /// runs it isn't bundled, so install ffmpeg on PATH to test - e.g. <c>brew install ffmpeg</c>.
     /// </summary>
     public static class FfmpegLocator
     {
