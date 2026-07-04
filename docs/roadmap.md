@@ -1,7 +1,7 @@
 # Roadmap de sobe
 
 Editor de beatmaps para osu!
-Version actual: v0.9.68-beta
+Version actual: v0.9.69-beta
 
 Lo marcado con check esta hecho. Lo que falta lleva el porcentaje completado.
 
@@ -23,6 +23,7 @@ Lo marcado con check esta hecho. Lo que falta lleva el porcentaje completado.
 - ✓ Hitsounds completos: reproduccion con samples del mapa y skin, loops de slider/spinner, sample sets e index, samples y volumen por objeto, copiar/pegar, editor de lanes en la timeline (pintar, atajos W/E/R, hover, feedback de reproduccion) y opcion de ignorar los hitsounds del mapa
 - ✓ Discord Rich Presence en escritorio (muestra editando/navegando, activable desde ajustes)
 - ✓ Guias de distancia y deteccion de blankets al colocar objetos (manteniendo Shift)
+- ✓ Snap to grid (T): al colocar, al dibujar sliders (anchors + handles) y al mover objetos; mas atajos QoL (duplicar Ctrl+D, ir a timestamp, tiempo copiable)
 
 ## En desarrollo
 

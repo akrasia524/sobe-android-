@@ -35,6 +35,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Resolves where a circle placement at a cursor position would actually land (distance/magnetic snap).</summary>
         public Func<Vector2, Vector2>? PlacementSnap;
 
+        /// <summary>Snaps an osu!-space position to the grid when grid snap is on (else returns it unchanged). Applied to
+        /// slider anchors while drawing and to control-point handles while editing, so the whole slider follows the grid.</summary>
+        public Func<Vector2, Vector2>? GridSnap;
+
         /// <summary>Resolves the Shift-held spacing guide (snapped position + distance lines) for a cursor position.</summary>
         public Func<Vector2, SpacingGuide>? SpacingGuideResolver;
 
@@ -1393,7 +1397,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 moving = true;
                 moveStart = start;
-                actions.BeginMove();
+                // Pass the grabbed object's position so grid snap (if on) lands that object on the grid.
+                actions.BeginMove(o.Position);
                 return true;
             }
 
@@ -1494,10 +1499,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Commits a slider anchor at the given (clamped) position, starting the trace on the first click.</summary>
         private void addSliderAnchor(Vector2 osuPosition)
         {
-            // The head (the first anchor) snaps exactly like a placed circle (distance + magnetic snap); the
-            // later anchors are placed freely where clicked.
+            // The head (the first anchor) snaps exactly like a placed circle (distance + magnetic snap); the later
+            // anchors are placed freely, except grid snap - which applies to every anchor so the whole slider grids.
             bool isHead = !buildingSlider;
-            Vector2 p = clampToPlayfield(isHead && PlacementSnap != null ? PlacementSnap(osuPosition) : osuPosition);
+            Vector2 snapped = isHead && PlacementSnap != null
+                ? PlacementSnap(osuPosition)
+                : GridSnap?.Invoke(osuPosition) ?? osuPosition;
+            Vector2 p = clampToPlayfield(snapped);
 
             if (!buildingSlider)
             {
@@ -1611,6 +1619,19 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             gridSizeIndex = (gridSizeIndex + 1) % grid_sizes.Length;
             buildGrid();
+        }
+
+        /// <summary>Current grid spacing in osu!pixels, or 0 when the grid is off. Used by grid snapping.</summary>
+        public float CurrentGridSize => grid_sizes[gridSizeIndex];
+
+        /// <summary>Turns the grid on at the default spacing if it's currently off (so grid snap has something to snap to).</summary>
+        public void EnsureGridVisible()
+        {
+            if (grid_sizes[gridSizeIndex] == 0)
+            {
+                gridSizeIndex = 2; // 16px, the default
+                buildGrid();
+            }
         }
 
         private void buildGrid()
@@ -1953,6 +1974,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         // head/tail node or the body selects just that part.
                         PartNodeClicked = node => nodeSelection.Select(sliderId, node),
                         BodyClicked = () => nodeSelection.SelectBody(sliderId),
+                        // Editing a control-point handle snaps it to the grid too, when grid snap is on.
+                        SnapToGrid = GridSnap,
                     });
                     return;
                 }
@@ -2518,6 +2541,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             if (sliderPreview == null || !buildingSlider)
                 return;
+
+            // Grid-snap the moving tail so the preview shows where the next anchor will actually land.
+            cursor = GridSnap?.Invoke(cursor) ?? cursor;
 
             var pts = new List<SliderControlPoint>(sliderAnchors) { new SliderControlPoint(clampToPlayfield(cursor)) };
             updateSliderNodes(pts);

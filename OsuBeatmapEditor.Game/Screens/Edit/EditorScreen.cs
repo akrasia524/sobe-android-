@@ -156,11 +156,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private int moveTimeDelta;
         private Vector2 movePosDelta;
         private Vector2 moveMin, moveMax;
+        // Original position of the grabbed object for a playfield drag, so grid snap can land IT on the grid
+        // (null for timeline/nudge moves, which don't grid-snap).
+        private Vector2? moveGridAnchor;
 
         // Distance snapping: when on, placement is spaced from the previous object proportionally to the time
         // gap (so streams keep slider velocity). Spacing multiplier is adjusted with Alt+scroll, like lazer.
         private bool distanceSnapEnabled;
         private double distanceSpacing = 1.0;
+        // Grid snapping (T): when on, placement snaps to the nearest visual-grid intersection.
+        private bool gridSnapEnabled;
 
         /// <summary>An undo snapshot of the editable map state (objects + timing points).</summary>
         private sealed record Snapshot(List<HitObjectModel> Objects, List<TimingPointModel> TimingPoints, List<Annotations.Annotation> Annotations);
@@ -348,6 +353,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private readonly Dictionary<string, SampleChannel> activeLoops = new Dictionary<string, SampleChannel>();
         private readonly HashSet<string> desiredLoops = new HashSet<string>();
         private readonly List<string> loopsToStop = new List<string>();
+        // How loud the automatic sliderslide loop plays relative to the timing-point volume. The default friction
+        // sample is harsh at full volume; keep it a subtle presence. Lower toward 0 to mute it further.
+        private const float slider_slide_volume = 0.35f;
 
         /// <summary>The hitsounds applied to newly placed objects (set from the left-panel palette when nothing is selected).</summary>
         private int pendingHitSound;
@@ -612,7 +620,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             : Empty(),
                     },
                 },
-                bottomTimeline = new EditorTimeline(track, parsed, () => VisualTime, rightInset: PlaybackControl.WIDTH) { Anchor = Anchor.BottomLeft, Origin = Anchor.BottomLeft },
+                bottomTimeline = new EditorTimeline(track, parsed, () => VisualTime, rightInset: PlaybackControl.WIDTH) { Anchor = Anchor.BottomLeft, Origin = Anchor.BottomLeft, OnTimeClicked = copyCurrentTimestamp },
                 playbackControl = new PlaybackControl(track, () => track?.IsRunning ?? false, togglePlay)
                 {
                     Anchor = Anchor.BottomRight,
@@ -885,6 +893,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             playfield.TimeSource = () => VisualTime;
             playfield.SnappedTimeSource = () => snapTime(CurrentTime);
             playfield.PlacementSnap = SnapPlacement;
+            playfield.GridSnap = GridSnapPosition;
 
             setupVideoExportPanel();
             playfield.SpacingGuideResolver = ResolveSpacingGuide;
@@ -2170,7 +2179,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                     if (o.Kind == HitObjectKind.Slider)
                     {
-                        ensureLoop($"{o.Id}:slide", bank, "sliderslide", index, volume);
+                        // sliderslide plays automatically on every slider (the mapper doesn't opt in), and the default
+                        // friction sample is a harsh continuous "shhh" that dominates at full timing-point volume. Play
+                        // it well below that so it's a subtle presence, not fatiguing. (The whistle below is opt-in via
+                        // the whistle bit, so it stays at full volume.)
+                        ensureLoop($"{o.Id}:slide", bank, "sliderslide", index, volume * slider_slide_volume);
                         // The slider body also whistles for the whole slide when its hitsound carries the whistle bit.
                         if ((o.HitSound & 0b0010) != 0)
                             ensureLoop($"{o.Id}:whistle", bank, "sliderwhistle", index, volume);
@@ -3450,13 +3463,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             afterEdit();
         }
 
-        public void BeginMove()
+        public void BeginMove(Vector2? gridAnchor = null)
         {
             // Snapshot the selection and its bounds; the drag only previews (translates drawables),
             // then commits to the model on release - this is how lazer keeps moving smooth.
             moveSnapshot.Clear();
             moveTimeDelta = 0;
             movePosDelta = Vector2.Zero;
+            moveGridAnchor = gridAnchor;
 
             var min = new Vector2(float.MaxValue);
             var max = new Vector2(float.MinValue);
@@ -3501,12 +3515,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             Vector2 delta = new Vector2((float)Math.Round(rawDelta.X), (float)Math.Round(rawDelta.Y));
 
-            // Magnetic stacking snap: if dragging the selection brings any of its snap points within the
-            // magnetic radius of an unselected on-screen object, latch the two together. This mirrors lazer's
-            // checkSnappingBlueprintToNearbyObjects + snapToVisibleBlueprints - it lets you drop an object onto
-            // another to stack them precisely, no matter how far apart in time (the stacking below then resolves
-            // the diagonal offset if they're within stack leniency).
-            delta = magneticMoveSnap(delta);
+            if (gridSnapEnabled && playfield.CurrentGridSize > 0 && moveGridAnchor is Vector2 anchor)
+            {
+                // Grid snap wins over magnetic: shift the delta so the grabbed object lands exactly on a grid point
+                // (the rest of the selection moves rigidly with it).
+                delta = snapToGrid(anchor + delta, playfield.CurrentGridSize) - anchor;
+            }
+            else
+            {
+                // Magnetic stacking snap: if dragging the selection brings any of its snap points within the
+                // magnetic radius of an unselected on-screen object, latch the two together. This mirrors lazer's
+                // checkSnappingBlueprintToNearbyObjects + snapToVisibleBlueprints - it lets you drop an object onto
+                // another to stack them precisely, no matter how far apart in time (the stacking below then resolves
+                // the diagonal offset if they're within stack leniency).
+                delta = magneticMoveSnap(delta);
+            }
 
             // Clamp so the whole selection stays inside the playfield.
             float dx = Math.Clamp(delta.X, -moveMin.X, ParsedBeatmap.PLAYFIELD_WIDTH - moveMax.X);
@@ -3537,6 +3560,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             int time = (int)Math.Round(snapTime(CurrentTime));
 
+            // Grid snap takes over placement entirely: the cursor locks to the nearest grid intersection.
+            if (gridSnapEnabled && playfield.CurrentGridSize > 0)
+                return snapToGrid(cursor, playfield.CurrentGridSize);
+
             Vector2 pos = cursor;
             if (distanceSnapEnabled)
                 pos = applyDistanceSnap(pos, time);
@@ -3549,6 +3576,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 pos = target;
 
             return pos;
+        }
+
+        /// <summary>Grid-snaps a position when grid snap is on and the grid is visible; otherwise returns it unchanged.
+        /// Shared by placement, slider anchors and control-point handles so the whole slider follows the grid.</summary>
+        private Vector2 GridSnapPosition(Vector2 osuPos)
+            => gridSnapEnabled && playfield.CurrentGridSize > 0 ? snapToGrid(osuPos, playfield.CurrentGridSize) : osuPos;
+
+        /// <summary>Snaps a position to the nearest intersection of the centred visual grid (spacing <paramref name="size"/> osu!px).</summary>
+        private static Vector2 snapToGrid(Vector2 pos, float size)
+        {
+            const float cx = ParsedBeatmap.PLAYFIELD_WIDTH / 2f;  // the grid is drawn outward from the playfield centre
+            const float cy = ParsedBeatmap.PLAYFIELD_HEIGHT / 2f;
+            return new Vector2(
+                cx + (float)Math.Round((pos.X - cx) / size) * size,
+                cy + (float)Math.Round((pos.Y - cy) / size) * size);
         }
 
         /// <summary>True while the Shift-held spacing-guide mode should be engaged (Shift down during placement).</summary>
@@ -5578,7 +5620,20 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 ? $"{formatTimestamp(time)} ({string.Join(",", objects.Select(o => o.ComboNumber))}) - "
                 : $"{formatTimestamp(time)} - ";
 
+            lastCopiedTimestamp = stamp;
             hostClipboard?.SetText(stamp);
+        }
+
+        // The timestamp we last wrote to the OS clipboard on copy, so Ctrl+V can tell "paste my objects" from
+        // "go to a timestamp someone else shared" (see tryGoToTimestamp).
+        private string? lastCopiedTimestamp;
+
+        /// <summary>Copies the current playhead timestamp ("mm:ss:fff") to the OS clipboard - the bottom-left time is clickable.</summary>
+        private void copyCurrentTimestamp()
+        {
+            string stamp = formatTimestamp(CurrentTime);
+            hostClipboard?.SetText(stamp);
+            toasts?.Push($"Copied {stamp}", EditorTheme.Colours.Success);
         }
 
         /// <summary>Formats a time (ms) as the osu! editor/modding timestamp "mm:ss:fff".</summary>
@@ -5595,6 +5650,83 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             copySelection();
             DeleteSelected();
+        }
+
+        /// <summary>
+        /// Clones the selected objects in place (same time + position, fresh ids) and selects the clones, like
+        /// osu!lazer's Ctrl+D. The copies land exactly on top of the originals, ready to nudge/drag off.
+        /// </summary>
+        private void duplicateSelection()
+        {
+            var ids = new HashSet<int>(selection.Selected);
+            if (ids.Count == 0)
+                return;
+
+            var src = parsed.HitObjects.Where(o => ids.Contains(o.Id)).OrderBy(o => o.StartTime).ToList();
+
+            pushUndo();
+
+            int id = nextId();
+            var newIds = new List<int>(src.Count);
+            foreach (var o in src)
+            {
+                newIds.Add(id);
+                parsed.HitObjects.Add(o with { Id = id });
+                id++;
+            }
+
+            parsed.HitObjects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
+            recomputeSliderDurationsData();
+            afterEdit();
+            selection.SetRange(newIds);
+        }
+
+        // Matches an osu! editor/modding timestamp "mm:ss:fff" (colon or dot before the ms), optionally followed by a
+        // "(1,2,3)" object run. Used to jump when the OS clipboard holds a timestamp someone shared (a mod, collab, chat).
+        private static readonly System.Text.RegularExpressions.Regex timestamp_regex =
+            new System.Text.RegularExpressions.Regex(@"(\d+):(\d{2})[:.](\d{3})(?:\s*\(([\d,]+)\))?",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>
+        /// If the OS clipboard holds an osu! timestamp that we didn't just write ourselves (i.e. it came from outside),
+        /// seeks there and selects the referenced object run, and returns true. Otherwise returns false so Ctrl+V falls
+        /// through to the normal object paste. This is what makes pasting "00:10:787 (1,2,3)" jump to that spot.
+        /// </summary>
+        private bool tryGoToTimestamp()
+        {
+            string? text = hostClipboard?.GetText();
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            // A timestamp we wrote on our last copy means "paste the objects I copied", not "seek".
+            if (text.Trim() == lastCopiedTimestamp?.Trim())
+                return false;
+
+            var m = timestamp_regex.Match(text);
+            if (!m.Success)
+                return false;
+
+            double time = int.Parse(m.Groups[1].Value) * 60000.0
+                          + int.Parse(m.Groups[2].Value) * 1000.0
+                          + int.Parse(m.Groups[3].Value);
+
+            SeekTo(time);
+
+            // Select the "(a,b,c)" run: that many consecutive objects starting at the timestamp.
+            if (m.Groups[4].Success)
+            {
+                int count = m.Groups[4].Value.Split(',', StringSplitOptions.RemoveEmptyEntries).Length;
+                var run = parsed.HitObjects
+                                .Where(o => o.StartTime >= time - 2)
+                                .OrderBy(o => o.StartTime)
+                                .Take(count)
+                                .Select(o => o.Id)
+                                .ToList();
+                if (run.Count > 0)
+                    selection.SetRange(run);
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -6389,6 +6521,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return true;
             }
 
+            // Ctrl+D clones the selection in place (osu!lazer's duplicate), ready to nudge/drag off.
+            if (cmd && !e.Repeat && e.Key == Key.D)
+            {
+                duplicateSelection();
+                return true;
+            }
+
             // Copy / paste HITSOUNDS only (Ctrl+Shift+C / Ctrl+Shift+V): the additions/banks/volume/index "feel".
             // Placed before the plain Ctrl+C/V so the Shift variants win instead of falling through to object copy.
             if (cmd && e.ShiftPressed && !e.Repeat && e.Key == Key.C)
@@ -6418,6 +6557,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             if (cmd && !e.Repeat && e.Key == Key.V)
             {
+                // Pasting an osu! timestamp someone shared jumps there (and selects the run); otherwise paste objects.
+                if (tryGoToTimestamp())
+                    return true;
+
                 paste();
                 return true;
             }
@@ -6578,6 +6721,17 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (settings.DistanceSnapKey.Value.Matches(e) && !e.Repeat)
             {
                 distanceSnapEnabled = !distanceSnapEnabled;
+                return true;
+            }
+
+            // Toggle grid snapping (default T). Turning it on shows the grid if it was hidden, so there's a grid to snap to.
+            if (settings.GridSnapKey.Value.Matches(e) && !e.Repeat)
+            {
+                gridSnapEnabled = !gridSnapEnabled;
+                if (gridSnapEnabled)
+                    playfield.EnsureGridVisible();
+                toasts?.Push(gridSnapEnabled ? $"Grid snap on ({playfield.CurrentGridSize:0}px)" : "Grid snap off",
+                    gridSnapEnabled ? EditorTheme.Colours.Success : EditorTheme.Colours.TextMuted);
                 return true;
             }
 

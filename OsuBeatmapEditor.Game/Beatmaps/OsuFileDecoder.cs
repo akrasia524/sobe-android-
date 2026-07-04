@@ -52,9 +52,15 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                 {
                     section = line[1..^1];
 
-                    // Timing points always precede hit objects; order them once before we need them.
+                    // Timing points always precede hit objects; order them once before we need them. On a tie put the
+                    // red (uninherited/BPM) line BEFORE the green (inherited/SV) one: effectiveTiming resets sv=1 on a
+                    // red line, so if a coincident green sorted first its velocity would be overwritten by the red's
+                    // reset and never apply (List.Sort is unstable, so a time-only compare could swap them). Mirrors
+                    // ParsedBeatmap.RebuildTimingDerived - without it, a slider right on a red+green stack (e.g. Dale
+                    // Zelda Dale at 10787ms) parsed 1.5x too long until the next timing point.
                     if (section == "HitObjects")
-                        timingPoints.Sort((a, b) => a.Time.CompareTo(b.Time));
+                        timingPoints.Sort((a, b) =>
+                            a.Time != b.Time ? a.Time.CompareTo(b.Time) : b.Uninherited.CompareTo(a.Uninherited));
 
                     continue;
                 }

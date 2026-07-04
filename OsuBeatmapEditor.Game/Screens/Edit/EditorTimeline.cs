@@ -31,6 +31,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private SpriteText percentText = null!;
         private SeekBar seekBar = null!;
 
+        /// <summary>Invoked when the current-time readout is clicked (the editor copies the timestamp).</summary>
+        public Action? OnTimeClicked;
+
         public EditorTimeline(Track? track, ParsedBeatmap? beatmap, Func<double>? timeSource = null, float rightInset = 0)
         {
             this.track = track;
@@ -65,32 +68,38 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Colour = OsuColour.BackgroundRaised,
                     Alpha = 0.82f,
                 },
-                new FillFlowContainer
+                // Clicking the time copies the current timestamp (see OnTimeClicked); hence the ClickToCopy wrapper.
+                new ClickToCopy
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
                     Margin = new MarginPadding { Left = 16 },
-                    AutoSizeAxes = Axes.Both,
-                    Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(10, 0),
-                    Children = new Drawable[]
+                    Action = () => OnTimeClicked?.Invoke(),
+                    TooltipText = "Copy timestamp",
+                    Child = new FillFlowContainer
                     {
-                        timeText = new SpriteText
+                        AutoSizeAxes = Axes.Both,
+                        Direction = FillDirection.Horizontal,
+                        Spacing = new Vector2(10, 0),
+                        Children = new Drawable[]
                         {
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                            Colour = OsuColour.Text,
-                            Font = FontUsage.Default.With(size: 18, weight: "Bold", fixedWidth: true),
-                            Text = "00:00:000",
-                        },
-                        // Percentage of the way through the track, next to the time.
-                        percentText = new SpriteText
-                        {
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                            Colour = OsuColour.TextMuted,
-                            Font = FontUsage.Default.With(size: 14, weight: "SemiBold", fixedWidth: true),
-                            Text = "0%",
+                            timeText = new SpriteText
+                            {
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
+                                Colour = OsuColour.Text,
+                                Font = FontUsage.Default.With(size: 18, weight: "Bold", fixedWidth: true),
+                                Text = "00:00:000",
+                            },
+                            // Percentage of the way through the track, next to the time.
+                            percentText = new SpriteText
+                            {
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
+                                Colour = OsuColour.TextMuted,
+                                Font = FontUsage.Default.With(size: 14, weight: "SemiBold", fixedWidth: true),
+                                Text = "0%",
+                            },
                         },
                     },
                 },
@@ -132,6 +141,31 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // interpolating clock reading slightly off a tick - made the readout sit one ms either side).
             var t = TimeSpan.FromMilliseconds(ms);
             return $"{(int)t.TotalMinutes:00}:{t.Seconds:00}:{t.Milliseconds:000}";
+        }
+
+        /// <summary>A click-to-copy wrapper for the time readout: fires <see cref="Action"/> on click, with a hover tint and tooltip.</summary>
+        private partial class ClickToCopy : CompositeDrawable, osu.Framework.Graphics.Cursor.IHasTooltip
+        {
+            public Action? Action;
+            public osu.Framework.Localisation.LocalisableString TooltipText { get; set; }
+
+            public Drawable Child { set => InternalChild = value; }
+
+            public ClickToCopy() => AutoSizeAxes = Axes.Both;
+
+            protected override bool OnClick(ClickEvent e)
+            {
+                Action?.Invoke();
+                return true;
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                this.FadeTo(0.7f, 80, Easing.OutQuint);
+                return true;
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e) => this.FadeTo(1f, 80, Easing.OutQuint);
         }
 
         /// <summary>The seek bar with its timing/bookmark/preview markers.</summary>

@@ -151,6 +151,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Adds an inherited (green/SV) timing point at the playhead.</summary>
         public readonly Bindable<Shortcut> AddSvPointKey = new Bindable<Shortcut>(new Shortcut(Key.P, Ctrl: true, Shift: true));
 
+        /// <summary>Toggles snapping placed objects to the visual grid.</summary>
+        public readonly Bindable<Shortcut> GridSnapKey = new Bindable<Shortcut>(new Shortcut(Key.T));
+
         // Auto-preview cursor settings (persisted; the AU chip's mini-menu edits these).
         public readonly Bindable<Colour4> AutoCursorColour = new Bindable<Colour4>(Colour4.FromHex("ffdb33"));
         public readonly BindableFloat AutoTrailLength = new BindableFloat(10f) { MinValue = 0f, MaxValue = 120f, Precision = 1f };
@@ -242,6 +245,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 ["patterngallery"] = PatternGalleryKey,
                 ["addbpmpoint"] = AddBpmPointKey,
                 ["addsvpoint"] = AddSvPointKey,
+                ["gridsnap"] = GridSnapKey,
             };
 
             floats = new Dictionary<string, BindableFloat>

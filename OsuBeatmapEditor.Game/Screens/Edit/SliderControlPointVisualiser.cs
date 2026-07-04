@@ -32,6 +32,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Raised when the slider body (not a handle or edge node) is single-clicked.</summary>
         public Action? BodyClicked;
 
+        /// <summary>Snaps a dragged/inserted control point to the grid when grid snap is on (else returns it unchanged).</summary>
+        public Func<Vector2, Vector2>? SnapToGrid;
+
         private readonly int sliderId;
         private readonly int tailNodeIndex;
         private readonly float diameter;
@@ -145,7 +148,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private void handleMoved(int index, Vector2 screenPosition, bool finished)
         {
-            Vector2 osu = clamp(ToLocalSpace(screenPosition));
+            Vector2 osu = ToLocalSpace(screenPosition);
+            if (SnapToGrid != null)
+                osu = SnapToGrid(osu);
+            osu = clamp(osu);
 
             // Group move: if the dragged handle is part of a multi-selection, translate the whole selection by
             // the same delta (lazer's DragInProgress). Otherwise just move the dragged handle.
@@ -354,7 +360,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (Shortcut.CommandPressed(e) && nearPath(pos, Math.Max(8f, diameter / 2f)))
             {
                 int insertAt = nearestSegmentIndex(pos);
-                controlPoints.Insert(insertAt, new SliderControlPoint(pos));
+                // Hit-test with the raw click, but drop the inserted anchor on the grid when grid snap is on.
+                controlPoints.Insert(insertAt, new SliderControlPoint(SnapToGrid?.Invoke(pos) ?? pos));
                 actions.UpdateSliderAnchors(sliderId, controlPoints.ToArray());
                 return true;
             }

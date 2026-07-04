@@ -60,8 +60,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Deletes a single object by id (e.g. right-click quick delete).</summary>
         void DeleteObject(int id);
 
-        /// <summary>Snapshots the selection before a move drag begins.</summary>
-        void BeginMove();
+        /// <summary>Snapshots the selection before a move drag begins. <paramref name="gridAnchor"/> is the grabbed
+        /// object's position for a playfield drag (so grid snap lands it on the grid); null for timeline/nudge moves.</summary>
+        void BeginMove(Vector2? gridAnchor = null);
 
         /// <summary>Moves the selection in time, snapping the grabbed object to the beat grid.</summary>
         void MoveSelectionTime(double rawDeltaMs, int grabbedId);
