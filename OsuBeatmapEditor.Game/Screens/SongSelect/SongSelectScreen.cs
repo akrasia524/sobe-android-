@@ -551,6 +551,11 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             if (updatesInitialised || updates == null)
                 return;
 
+            // The self-updater swaps desktop builds in place and cannot update an Android APK, so on phones there is
+            // no update check, no prompt and no banner.
+            if (osu.Framework.RuntimeInfo.IsMobile)
+                return;
+
             updatesInitialised = true;
 
             updates.CheckForUpdatesOnce();
