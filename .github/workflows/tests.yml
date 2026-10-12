@@ -1,0 +1,62 @@
+name: Data-safety tests
+
+# Runs the pure data tests (OsuBeatmapEditor.Game.DataTests) on every push to android-port, or by hand.
+# Results are pushed to the "ci-logs-tests" branch (ci-tests.log, TestResults.trx, STATUS.txt) so they can be read
+# without opening the Actions page. A green run here proves the tests passed in CI, not that anything works on a device.
+on:
+  workflow_dispatch:
+  push:
+    branches: [android-port]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same CI-only SDK pin as the Android workflow (the runner defaults to .NET 10; the project is .NET 8).
+      - name: Pin .NET 8 SDK for this build
+        run: echo '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}' > global.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run tests
+        run: |
+          set +e
+          dotnet test OsuBeatmapEditor.Game.DataTests -c Release \
+            --logger "trx;LogFileName=TestResults.trx" --logger "console;verbosity=normal" \
+            --results-directory ./TestResults 2>&1 | tee ci-tests.log
+          code=${PIPESTATUS[0]}
+          echo "dotnet test exit code: $code" | tee -a ci-tests.log
+          exit $code
+
+      - name: Publish results to ci-logs-tests branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OUT=$(mktemp -d)
+          [ -f ci-tests.log ] && tail -n 4000 ci-tests.log > "$OUT/ci-tests.log"
+          cp TestResults/TestResults.trx "$OUT/" 2>/dev/null || true
+          printf 'run=%s\nsha=%s\nstatus=%s\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "${{ job.status }}" > "$OUT/STATUS.txt"
+          cd "$OUT"
+          git init -q && git checkout -q -b ci-logs-tests && git add -A
+          git -c user.name=github-actions -c user.email=actions@users.noreply.github.com commit -qm "Test results for $GITHUB_SHA"
+          gh auth setup-git
+          git push -f "https://github.com/$GITHUB_REPOSITORY.git" ci-logs-tests
