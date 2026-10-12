@@ -84,17 +84,20 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             return string.Join(',', parts);
         }
 
-        /// <summary>Offsets the object's position (and a slider's control points) by (dx, dy).</summary>
+        /// <summary>
+        /// Offsets the object's position (and a slider's control points) by (dx, dy). Coordinates are shifted as exact
+        /// decimals, so a fractional position (osu!lazer format v128+) keeps its decimals instead of being rounded.
+        /// </summary>
         public static string ShiftPosition(string raw, int dx, int dy)
         {
             string[] parts = raw.Split(',');
             if (parts.Length < 4
-                || !float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x)
-                || !float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y))
+                || !decimal.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out _)
+                || !decimal.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                 return raw;
 
-            parts[0] = ((int)Math.Round(x) + dx).ToString(CultureInfo.InvariantCulture);
-            parts[1] = ((int)Math.Round(y) + dy).ToString(CultureInfo.InvariantCulture);
+            parts[0] = shiftNumber(parts[0], dx);
+            parts[1] = shiftNumber(parts[1], dy);
 
             // Sliders (type bit 1) store anchors as "<type>|x:y|x:y|..." in parts[5].
             if (int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int type)
@@ -107,6 +110,12 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             return string.Join(',', parts);
         }
 
+        /// <summary>Adds <paramref name="delta"/> to a numeric token as an exact decimal; an unparsable token is left as it was.</summary>
+        private static string shiftNumber(string token, int delta) =>
+            decimal.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal value)
+                ? (value + delta).ToString(CultureInfo.InvariantCulture)
+                : token;
+
         /// <summary>
         /// Rewrites a slider's head position (parts 0/1), curve field (part 5) and pixel length (part 7) from
         /// edited control points, leaving the slide count and hitsounds untouched. Used by control-point editing.
@@ -117,11 +126,11 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             if (parts.Length < 6 || controlPoints.Count == 0)
                 return raw;
 
-            parts[0] = ((int)Math.Round(controlPoints[0].X)).ToString(CultureInfo.InvariantCulture);
-            parts[1] = ((int)Math.Round(controlPoints[0].Y)).ToString(CultureInfo.InvariantCulture);
+            parts[0] = SliderGeometry.FormatCoord(controlPoints[0].X);
+            parts[1] = SliderGeometry.FormatCoord(controlPoints[0].Y);
             parts[5] = SliderGeometry.CurveField(controlPoints);
             if (parts.Length >= 8)
-                parts[7] = pixelLength.ToString("0.###", CultureInfo.InvariantCulture);
+                parts[7] = pixelLength.ToString("0.######", CultureInfo.InvariantCulture);
             return string.Join(',', parts);
         }
 
@@ -240,15 +249,16 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         {
             string[] tokens = curve.Split('|');
 
-            // tokens[0] is the curve-type letter (B/L/P/C); the rest are "x:y" anchors.
+            // tokens[0] is the curve-type letter (B/L/P/C, optionally with a degree); the rest are "x:y" anchors.
+            // Inline type letters between anchors (lazer-style multi-segment sliders) are left untouched.
             for (int i = 1; i < tokens.Length; i++)
             {
                 string[] xy = tokens[i].Split(':');
                 if (xy.Length == 2
-                    && float.TryParse(xy[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float px)
-                    && float.TryParse(xy[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float py))
+                    && decimal.TryParse(xy[0], NumberStyles.Float, CultureInfo.InvariantCulture, out _)
+                    && decimal.TryParse(xy[1], NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                 {
-                    tokens[i] = $"{(int)Math.Round(px) + dx}:{(int)Math.Round(py) + dy}";
+                    tokens[i] = shiftNumber(xy[0], dx) + ":" + shiftNumber(xy[1], dy);
                 }
             }
 

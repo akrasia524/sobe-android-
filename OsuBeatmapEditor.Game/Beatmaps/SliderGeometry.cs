@@ -374,10 +374,28 @@ namespace OsuBeatmapEditor.Game.Beatmaps
 
         // --- Encoding (typed control points -> .osu curve field) ---
 
-        /// <summary>Port of lazer's <c>addPathData</c>: emits the curve field with inline per-segment type letters.</summary>
+        /// <summary>
+        /// Formats a coordinate without losing information: whole numbers are written as integers (what osu!stable
+        /// writes) and fractional values keep their decimals (osu!lazer format v128+ allows them).
+        /// </summary>
+        public static string FormatCoord(float value) =>
+            value == MathF.Round(value)
+                ? ((long)value).ToString(CultureInfo.InvariantCulture)
+                : value.ToString("0.######", CultureInfo.InvariantCulture);
+
+        private static string coords(SliderControlPoint point) => FormatCoord(point.X) + ":" + FormatCoord(point.Y);
+
+        /// <summary>
+        /// Port of lazer's <c>LegacyBeatmapEncoder.addPathData</c>: emits the curve field. A new segment of the SAME
+        /// type is written the way osu!stable understands it (the boundary control point duplicated); an inline type
+        /// letter is only written where the type changes (or for perfect-curve runs, which stable cannot express with
+        /// duplicates). Always writing inline letters, as before, produced curve strings stable/droid-style parsers
+        /// cannot read for multi-segment sliders.
+        /// </summary>
         public static string CurveField(IReadOnlyList<SliderControlPoint> controlPoints)
         {
             var sb = new StringBuilder();
+            SliderPathType? lastType = null;
 
             for (int i = 0; i < controlPoints.Count; i++)
             {
@@ -385,29 +403,46 @@ namespace OsuBeatmapEditor.Game.Beatmaps
 
                 if (point.Type is SliderPathType type)
                 {
-                    switch (type.Type)
+                    bool needsExplicitSegment = lastType == null || type != lastType.Value || type.Type == SliderSplineType.PerfectCurve;
+
+                    // If the previous segment already ended in a duplicated pair, another duplicate would be read
+                    // back as one longer segment, so spell this boundary out with an explicit type letter.
+                    if (i > 1 && controlPoints[i - 1].Position == controlPoints[i - 2].Position)
+                        needsExplicitSegment = true;
+
+                    if (needsExplicitSegment)
                     {
-                        case SliderSplineType.BSpline:
-                            sb.Append(type.Degree > 0 ? $"B{type.Degree}|" : "B|");
-                            break;
+                        switch (type.Type)
+                        {
+                            case SliderSplineType.BSpline:
+                                sb.Append(type.Degree > 0 ? $"B{type.Degree}|" : "B|");
+                                break;
 
-                        case SliderSplineType.Catmull:
-                            sb.Append("C|");
-                            break;
+                            case SliderSplineType.Catmull:
+                                sb.Append("C|");
+                                break;
 
-                        case SliderSplineType.PerfectCurve:
-                            sb.Append("P|");
-                            break;
+                            case SliderSplineType.PerfectCurve:
+                                sb.Append("P|");
+                                break;
 
-                        case SliderSplineType.Linear:
-                            sb.Append("L|");
-                            break;
+                            case SliderSplineType.Linear:
+                                sb.Append("L|");
+                                break;
+                        }
+
+                        lastType = type;
+                    }
+                    else
+                    {
+                        // New segment of the same type: legacy implicit segment = duplicate the control point.
+                        sb.Append(coords(point)).Append('|');
                     }
                 }
 
                 if (i != 0)
                 {
-                    sb.Append(FormattableString.Invariant($"{(int)Math.Round(point.X)}:{(int)Math.Round(point.Y)}"));
+                    sb.Append(coords(point));
                     if (i != controlPoints.Count - 1)
                         sb.Append('|');
                 }

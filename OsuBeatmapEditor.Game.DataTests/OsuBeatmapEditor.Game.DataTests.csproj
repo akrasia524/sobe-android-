@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pure data-safety tests (no window, no GPU, no device): .osu parsing, patching, slider curves, timing points and,
+    later, the app-owned library. They run on every push in CI (see .github/workflows/tests.yml).
+    NUnit itself comes in transitively through osu!framework, exactly like OsuBeatmapEditor.Game.Tests.
+  -->
+  <PropertyGroup Label="Project">
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest></ApplicationManifest>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup Label="Project References">
+    <ProjectReference Include="..\OsuBeatmapEditor.Game\OsuBeatmapEditor.Game.csproj" />
+  </ItemGroup>
+  <ItemGroup Label="Package References">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.4.2" />
+  </ItemGroup>
+</Project>

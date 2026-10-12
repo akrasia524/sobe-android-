@@ -16,6 +16,17 @@ namespace OsuBeatmapEditor.Game.Beatmaps
     {
         private readonly record struct TimingPoint(double Time, double BeatLength, bool Uninherited, bool Kiai, int SampleSet, int Volume);
 
+        /// <summary>Whether <paramref name="line"/> is a hit object line this decoder accepts (x, y, time and type all parse).</summary>
+        public static bool IsValidHitObjectLine(string line)
+        {
+            string[] parts = line.Split(',');
+            return parts.Length >= 4
+                   && float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out _)
+                   && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out _)
+                   && double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out _)
+                   && int.TryParse(parts[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
+        }
+
         public static ParsedBeatmap Decode(string path)
         {
             using var reader = new StreamReader(path);
