@@ -23,7 +23,7 @@ namespace OsuBeatmapEditor.Game.UI
     public partial class TopBar : CompositeDrawable
     {
         /// <summary>Fixed height of the bar; screens lay other chrome out below this.</summary>
-        public const float HeightPx = 52;
+        public static readonly float HeightPx = MobileMetrics.TopBarHeight;
 
         public TopBar()
         {

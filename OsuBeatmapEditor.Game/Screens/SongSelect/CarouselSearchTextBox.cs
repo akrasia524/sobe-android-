@@ -7,6 +7,7 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using OsuBeatmapEditor.Game.Graphics;
 using OsuBeatmapEditor.Game.Screens.Edit;
+using OsuBeatmapEditor.Game.UI;
 using osuTK.Input;
 
 namespace OsuBeatmapEditor.Game.Screens.SongSelect
@@ -21,7 +22,8 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         public CarouselSearchTextBox()
         {
             // Don't drop focus when the user presses Enter (which opens the selected map).
-            ReleaseFocusOnCommit = false;
+            // (On phones the keyboard's "done" key should dismiss the keyboard instead.)
+            ReleaseFocusOnCommit = MobileMetrics.IsMobile;
 
             Masking = true;
             CornerRadius = EditorTheme.Radius.Md;
@@ -31,11 +33,16 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         }
 
         // Always wants focus, so typing anywhere lands in the search box.
-        public override bool RequestsFocus => true;
+        // Not on phones: a box that always wants focus keeps re-opening the on-screen keyboard.
+        public override bool RequestsFocus => !MobileMetrics.IsMobile;
 
         protected override void Update()
         {
             base.Update();
+
+            // On phones focus is only ever gained by tapping the box, and lost by tapping elsewhere.
+            if (MobileMetrics.IsMobile)
+                return;
 
             // Robustly hold focus: whenever nothing else is focused (e.g. after a click on a map card or
             // empty space), grab it back so the user can always type to search - like osu!lazer. We only

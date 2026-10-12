@@ -28,7 +28,7 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Card width (fixed so neighbouring chrome can position itself against it).</summary>
         public const float CardWidth = 250;
 
-        private const float bar_height = TopBar.HeightPx;
+        private static readonly float bar_height = TopBar.HeightPx;
         private const float avatar_size = 34;
         private const float dropdown_padding = 14;
 

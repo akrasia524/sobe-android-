@@ -205,7 +205,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                     {
                         Anchor = Anchor.BottomLeft,
                         Origin = Anchor.BottomLeft,
-                        Size = new Vector2(220, 56),
+                        Size = MobileMetrics.NewBeatmapButton,
                         Margin = new MarginPadding(30),
                         Action = onNewBeatmap,
                     },
@@ -216,7 +216,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         Anchor = Anchor.TopRight,
                         Origin = Anchor.TopRight,
                         Width = carousel_width - 24,
-                        Height = 40,
+                        Height = MobileMetrics.SearchRowHeight,
                         Margin = new MarginPadding { Top = TopBar.HeightPx + 12, Right = 24 },
                         Child = new GridContainer
                         {
@@ -246,7 +246,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                                     searchBox = new CarouselSearchTextBox
                                     {
                                         RelativeSizeAxes = Axes.X,
-                                        Height = 40,
+                                        Height = MobileMetrics.SearchRowHeight,
                                         PlaceholderText = "Search...",
                                     },
                                     null,
@@ -274,7 +274,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         AutoSizeAxes = Axes.Both,
                         Direction = FillDirection.Horizontal,
                         Spacing = new Vector2(EditorTheme.Spacing.Md, 0),
-                        Margin = new MarginPadding { Left = EditorTheme.Spacing.Lg, Top = (TopBar.HeightPx - 40) / 2f },
+                        Margin = new MarginPadding { Left = EditorTheme.Spacing.Lg, Top = (TopBar.HeightPx - MobileMetrics.TopBarButton) / 2f },
                         Children = new Drawable[]
                         {
                             topBarButton(FontAwesome.Solid.Cog, "Settings", () => settingsOverlay.ToggleVisibility()),
@@ -292,7 +292,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         Alpha = 0,
                         Direction = FillDirection.Horizontal,
                         Spacing = new Vector2(EditorTheme.Spacing.Md, 0),
-                        Margin = new MarginPadding { Right = UserProfileCard.CardWidth + EditorTheme.Spacing.Lg, Top = (TopBar.HeightPx - 40) / 2f },
+                        Margin = new MarginPadding { Right = UserProfileCard.CardWidth + EditorTheme.Spacing.Lg, Top = (TopBar.HeightPx - MobileMetrics.TopBarButton) / 2f },
                         Children = new Drawable[]
                         {
                             topBarButton(FontAwesome.Solid.Users, "Collabs", () => collabsOverlay.ToggleVisibility()),
@@ -530,8 +530,10 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             newBeatmapButton.MoveToY(40).FadeOut();
             newBeatmapButton.Delay(150).MoveToY(0, 500, Easing.OutQuint).FadeIn(500, Easing.OutQuint);
 
-            // Focus the search box so typing immediately filters (it holds focus thereafter).
-            Schedule(() => GetContainingFocusManager()?.ChangeFocus(searchBox));
+            // Desktop: focus the search box so typing immediately filters (it holds focus thereafter). On phones a
+            // focused text box opens the on-screen keyboard, so it only takes focus when the user taps it.
+            if (!MobileMetrics.IsMobile)
+                Schedule(() => GetContainingFocusManager()?.ChangeFocus(searchBox));
         }
 
         public override void OnSuspending(ScreenTransitionEvent e)
@@ -881,7 +883,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
         /// <summary>A standalone 40px icon button sized for the top bar.</summary>
         private static MenuIconButton topBarButton(IconUsage icon, string tooltip, Action action) =>
-            new MenuIconButton(icon, tooltip, action) { Size = new Vector2(40) };
+            new MenuIconButton(icon, tooltip, action) { Size = new Vector2(MobileMetrics.TopBarButton) };
 
         /// <summary>
         /// A small grouped "card" holding the playback controls — random map (F2), refresh library (F5),
@@ -889,7 +891,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         /// </summary>
         private Drawable buildPlaybackCard()
         {
-            const float button = 34;
+            float button = MobileMetrics.PlaybackButton;
 
             return new Container
             {
