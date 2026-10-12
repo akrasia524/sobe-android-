@@ -21,6 +21,7 @@ namespace OsuBeatmapEditor.Android
         {
             // Must be installed before the game thread starts so early crashes are shown on screen.
             CrashReporter.Install(this);
+            NativeLibraries.Preload(this);
             base.OnCreate(savedInstanceState);
         }
 

@@ -85,6 +85,10 @@ namespace OsuBeatmapEditor.Android
                 sb.AppendLine();
                 sb.AppendLine(detail);
 
+                sb.AppendLine();
+                sb.AppendLine("---- native libraries ----");
+                sb.AppendLine(NativeLibraries.Report);
+
                 string? tail = readFrameworkLogTail(app);
                 if (tail != null)
                 {
