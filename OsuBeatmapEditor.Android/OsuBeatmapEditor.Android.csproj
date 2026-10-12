@@ -53,5 +53,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ppy.osu.Framework.Android" Version="2026.527.0" />
+    <!-- ppy.osu.Framework.NativeLibs ships DESKTOP libraries only (its android folder is an empty placeholder).
+         Because the Android runtime id (android-arm64) falls back to linux-arm64, NuGet packed the desktop (glibc)
+         libbass/libbass_fx/libbassmix into the APK, shadowing the real Android ones from osu.Framework.Android,
+         which crashed at startup with DllNotFoundException: bass. Android needs nothing from this package, so
+         exclude all of its assets. The version must match the one osu!framework 2026.527.0 depends on. -->
+    <PackageReference Include="ppy.osu.Framework.NativeLibs" Version="2025.806.0-nativelibs" ExcludeAssets="all" />
   </ItemGroup>
 </Project>

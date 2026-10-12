@@ -73,6 +73,28 @@ jobs:
           ls -l sobe-debug.apk
           echo "size=$(stat -c %s sobe-debug.apk)" >> "$GITHUB_OUTPUT"
 
+      # Guards against the "desktop Linux libraries packed into the Android APK" bug that crashed startup with
+      # DllNotFoundException: bass. Fails the build (so nothing gets published) if libbass* is a glibc build.
+      - name: Verify native libraries in the APK
+        run: |
+          rm -rf apkcheck && mkdir apkcheck && cd apkcheck
+          unzip -q ../sobe-debug.apk 'lib/arm64-v8a/*'
+          {
+            echo "== libraries in APK (arm64-v8a)"
+            ls -l lib/arm64-v8a
+            echo "== libraries that need desktop-Linux (glibc) system libraries"
+            for f in lib/arm64-v8a/*.so; do
+              if readelf -d "$f" 2>/dev/null | grep -qE 'NEEDED.*\[(libc\.so\.6|libpthread\.so\.0|libdl\.so\.2|libm\.so\.6|libstdc\+\+\.so\.6)\]'; then
+                echo "GLIBC: $f"
+              fi
+            done
+            echo "== end"
+          } | tee ../ci-native.log
+          if grep -q 'GLIBC: lib/arm64-v8a/libbass' ../ci-native.log; then
+            echo "ERROR: desktop Linux BASS libraries were packed into the APK"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: sobe-debug-apk
