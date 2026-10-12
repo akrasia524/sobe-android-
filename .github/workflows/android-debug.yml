@@ -36,10 +36,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # The pinned osu!framework (2026.527.0) and the Game project are .NET 8.
+      # The pinned osu!framework (2026.527.0) and the Game project are .NET 8. The runner image also ships .NET 10,
+      # which would be picked by default (and rejects net8.0-android packages), so pin the SDK for CI only.
+      # Written here instead of committed so it cannot affect anyone's local .NET 10 builds.
+      - name: Pin .NET 8 SDK for this build
+        run: echo '{"sdk":{"version":"8.0.100","rollForward":"latestFeature"}}' > global.json
+
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
+
+      - name: Show SDK in use
+        run: dotnet --version 2>&1 | tee ci-dotnet-version.log
 
       - name: Install .NET Android workload
         run: dotnet workload install android 2>&1 | tee ci-workload.log

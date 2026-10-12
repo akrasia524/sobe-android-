@@ -27,6 +27,9 @@
     <!-- The repo-wide Directory.Build.props points at a Windows app manifest; meaningless on Android. -->
     <ApplicationManifest></ApplicationManifest>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- .NET 8 Android is past Microsoft's support window; the pinned osu!framework still requires it. -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <CheckEolWorkloads>false</CheckEolWorkloads>
   </PropertyGroup>
   <!-- Release builds: no IL trimming for now. osu!framework relies on reflection (DI, bindables), so trimming
        is only enabled later, after it has been verified on a real device. -->
