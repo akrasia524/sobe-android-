@@ -48,8 +48,10 @@ namespace OsuBeatmapEditor.Game
             if (host.Window != null)
             {
                 host.Window.Title = AppInfo.FullName;
-                // Enforce a usable minimum editor size; the window may be larger.
-                host.Window.MinSize = new Size(1280, 720);
+                // Enforce a usable minimum editor size on desktop; the window may be larger. Phones have a fixed
+                // screen, so there is no resizable window to constrain.
+                if (!osu.Framework.RuntimeInfo.IsMobile)
+                    host.Window.MinSize = new Size(1280, 720);
             }
         }
 

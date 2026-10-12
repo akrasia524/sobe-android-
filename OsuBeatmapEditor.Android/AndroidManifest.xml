@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="io.github.akrasia524.sobe" android:installLocation="auto">
+	<uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
+	<uses-permission android:name="android.permission.INTERNET" />
+	<application android:label="sobe" android:allowBackup="false" android:supportsRtl="true">
+		<!-- Lets the app hand exported .osz files to the Android share sheet (osu!framework requires the
+		     authority to be exactly "<package>.fileprovider"). -->
+		<provider android:name="androidx.core.content.FileProvider"
+		          android:authorities="io.github.akrasia524.sobe.fileprovider"
+		          android:grantUriPermissions="true"
+		          android:exported="false">
+			<meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/filepaths" />
+		</provider>
+	</application>
+</manifest>

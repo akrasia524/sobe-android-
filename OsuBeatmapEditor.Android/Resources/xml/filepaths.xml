@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+	<!-- Paths are relative to the app's own external files dir (the only user storage path osu!framework uses). -->
+	<external-files-path path="exports" name="exports" />
+</paths>

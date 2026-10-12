@@ -77,6 +77,10 @@ namespace OsuBeatmapEditor.Game.Updates
             if (checkStarted)
                 return;
 
+            // The self-updater swaps desktop builds in place; it cannot update an Android APK. Skip it on phones.
+            if (osu.Framework.RuntimeInfo.IsMobile)
+                return;
+
             checkStarted = true;
             _ = checkAsync();
         }

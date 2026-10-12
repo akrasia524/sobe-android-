@@ -1,0 +1,97 @@
+name: Android debug APK
+
+# Builds an installable debug APK of the Android port.
+#  - Run it by hand: Actions tab -> "Android debug APK" -> Run workflow.
+#  - It also runs automatically on every push to the android-port branch.
+# Result: a GitHub pre-release named "android-debug-latest" with sobe-debug.apk attached
+# (also kept as a workflow artifact). Build logs are pushed to the "ci-logs" branch.
+on:
+  workflow_dispatch:
+  push:
+    branches: [android-port]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      PROJECT: OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The pinned osu!framework (2026.527.0) and the Game project are .NET 8.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install .NET Android workload
+        run: dotnet workload install android 2>&1 | tee ci-workload.log
+
+      - name: Install Android SDK dependencies
+        run: >
+          dotnet build "$PROJECT" -t:InstallAndroidDependencies -f net8.0-android
+          -p:AndroidSdkDirectory="$ANDROID_HOME" -p:AcceptAndroidSDKLicenses=True
+          2>&1 | tee ci-sdk.log
+
+      - name: Build debug APK
+        run: >
+          dotnet build "$PROJECT" -c Debug -p:AndroidSdkDirectory="$ANDROID_HOME" -v:minimal
+          2>&1 | tee ci-build.log
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK=$(find OsuBeatmapEditor.Android/bin/Debug -name '*-Signed.apk' | head -1)
+          if [ -z "$APK" ]; then APK=$(find OsuBeatmapEditor.Android/bin/Debug -name '*.apk' | head -1); fi
+          test -n "$APK" || { echo "No APK produced"; exit 1; }
+          cp "$APK" sobe-debug.apk
+          ls -l sobe-debug.apk
+          echo "size=$(stat -c %s sobe-debug.apk)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sobe-debug-apk
+          path: sobe-debug.apk
+          if-no-files-found: error
+
+      - name: Publish APK as pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=android-debug-latest
+          gh release delete "$TAG" --cleanup-tag --yes || true
+          gh release create "$TAG" sobe-debug.apk \
+            --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "sobe Android debug build" \
+            --notes "Debug APK built from commit $GITHUB_SHA. A successful build does NOT mean it was tested on a device."
+
+      - name: Publish logs to ci-logs branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OUT=$(mktemp -d)
+          for f in ci-*.log; do [ -f "$f" ] && tail -n 4000 "$f" > "$OUT/$f"; done
+          printf 'run=%s\nsha=%s\nstatus=%s\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "${{ job.status }}" > "$OUT/STATUS.txt"
+          cd "$OUT"
+          git init -q && git checkout -q -b ci-logs && git add -A
+          git -c user.name=github-actions -c user.email=actions@users.noreply.github.com commit -qm "CI logs for $GITHUB_SHA"
+          gh auth setup-git
+          git push -f "https://github.com/$GITHUB_REPOSITORY.git" ci-logs

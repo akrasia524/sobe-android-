@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Android host for the sobe editor.
+
+    Targets net8.0-android on purpose: the pinned osu!framework release (2026.527.0) and the Game project are
+    both .NET 8. Only unreleased osu!framework master has moved to .NET 10, so we must NOT use the .NET 10
+    sample as the template (that mismatch is what broke the earlier on-device Termux attempt).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>OsuBeatmapEditor.Android</RootNamespace>
+    <AssemblyName>OsuBeatmapEditor.Android</AssemblyName>
+    <Nullable>enable</Nullable>
+    <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
+    <!-- The Infinix Hot 50 is ARM64; building a single ABI keeps the APK small and the build fast. -->
+    <RuntimeIdentifier>android-arm64</RuntimeIdentifier>
+    <ApplicationId>io.github.akrasia524.sobe</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.9.69-android.1</ApplicationDisplayVersion>
+    <!-- Settings required by osu!framework on Android (copied from the framework's osu.Framework.Android.props). -->
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidHttpClientHandlerType>Xamarin.Android.Net.AndroidMessageHandler</AndroidHttpClientHandlerType>
+    <NullabilityInfoContextSupport>true</NullabilityInfoContextSupport>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <NoWarn>$(NoWarn);XA4218</NoWarn>
+    <!-- The repo-wide Directory.Build.props points at a Windows app manifest; meaningless on Android. -->
+    <ApplicationManifest></ApplicationManifest>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <!-- Release builds: no IL trimming for now. osu!framework relies on reflection (DI, bindables), so trimming
+       is only enabled later, after it has been verified on a real device. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OsuBeatmapEditor.Game\OsuBeatmapEditor.Game.csproj" />
+    <ProjectReference Include="..\OsuBeatmapEditor.Resources\OsuBeatmapEditor.Resources.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ppy.osu.Framework.Android" Version="2026.527.0" />
+  </ItemGroup>
+</Project>
