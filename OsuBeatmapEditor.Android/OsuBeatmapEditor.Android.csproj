@@ -31,6 +31,16 @@
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <CheckEolWorkloads>false</CheckEolWorkloads>
   </PropertyGroup>
+  <!-- Debug builds are signed with a fixed, committed debug key (the standard public Android debug key, password
+       "android") so every CI build has the SAME signature and can be installed over the previous one without
+       uninstalling. It is NOT a release key and must never be used to publish the app. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyStore>debug.keystore</AndroidSigningKeyStore>
+    <AndroidSigningKeyAlias>androiddebugkey</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>android</AndroidSigningKeyPass>
+    <AndroidSigningStorePass>android</AndroidSigningStorePass>
+  </PropertyGroup>
   <!-- Release builds: no IL trimming for now. osu!framework relies on reflection (DI, bindables), so trimming
        is only enabled later, after it has been verified on a real device. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">

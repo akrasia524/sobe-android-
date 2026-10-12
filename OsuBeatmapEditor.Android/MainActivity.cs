@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Content.PM;
+using Android.OS;
 using osu.Framework.Android;
 using OsuBeatmapEditor.Game;
 
@@ -16,6 +17,13 @@ namespace OsuBeatmapEditor.Android
         ScreenOrientation = ScreenOrientation.FullUser)]
     public class MainActivity : AndroidGameActivity
     {
+        protected override void OnCreate(Bundle? savedInstanceState)
+        {
+            // Must be installed before the game thread starts so early crashes are shown on screen.
+            CrashReporter.Install(this);
+            base.OnCreate(savedInstanceState);
+        }
+
         protected override osu.Framework.Game CreateGame() => new OsuBeatmapEditorGame();
     }
 }
