@@ -112,6 +112,7 @@ namespace OsuBeatmapEditor.Game.Library
                         throw new InvalidDataException("written by a newer version of the app");
 
                     index[id] = record;
+                    sweepSavingLeftovers(Path.Combine(dir, "files"));
                 }
                 catch (Exception ex)
                 {
@@ -120,6 +121,23 @@ namespace OsuBeatmapEditor.Game.Library
             }
 
             Problems = problems;
+        }
+
+        /// <summary>Removes half-written ".saving-*" files a crash may have left next to a beatmap file.</summary>
+        private static void sweepSavingLeftovers(string filesDir)
+        {
+            try
+            {
+                if (!Directory.Exists(filesDir))
+                    return;
+
+                foreach (string f in Directory.EnumerateFiles(filesDir, "*.saving-*", SearchOption.AllDirectories))
+                    File.Delete(f);
+            }
+            catch
+            {
+                // Best effort.
+            }
         }
 
         // ------------------------------------------------------------------------------------------ import
@@ -352,7 +370,7 @@ namespace OsuBeatmapEditor.Game.Library
             {
                 var diff = requireDifficulty(requireSet(setId), fileName);
                 string dir = backupDirectory(setId, diff.File);
-                return Directory.Exists(dir) ? Directory.GetFiles(dir, "*.bak").Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal).ToList()! : new List<string>();
+                return Directory.Exists(dir) ? Directory.GetFiles(dir, "*.bak").Select(f => Path.GetFileName(f)).OrderBy(n => n, StringComparer.Ordinal).ToList() : new List<string>();
             }
         }
 
@@ -408,7 +426,7 @@ namespace OsuBeatmapEditor.Game.Library
             string dir = backupDirectory(setId, relativeFile);
             Directory.CreateDirectory(dir);
 
-            var existing = Directory.GetFiles(dir, "*.bak").Select(Path.GetFileName).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            var existing = Directory.GetFiles(dir, "*.bak").Select(f => Path.GetFileName(f)).OrderBy(n => n, StringComparer.Ordinal).ToList();
             int next = existing.Count == 0 ? 1 : int.Parse(Path.GetFileNameWithoutExtension(existing[^1])!) + 1;
 
             File.Copy(target, Path.Combine(dir, next.ToString("D6") + ".bak"));
