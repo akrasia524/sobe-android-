@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OsuBeatmapEditor.Game.Library;
 
 namespace OsuBeatmapEditor.Game.Beatmaps
 {
@@ -27,6 +28,11 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         public string LibraryFilesDirectory { get; init; } = string.Empty;
 
         public bool IsLibrarySet => LibraryFilesDirectory.Length > 0;
+
+        /// <summary>For library sets: the library and set id used to save edits back (see <see cref="LibrarySaver"/>).</summary>
+        public LibraryStore? Library { get; init; }
+
+        public string LibrarySetId { get; init; } = string.Empty;
 
         /// <summary>Maps a stored filename (lower-cased, e.g. the audio file) to its SHA-256 hash in the file store.</summary>
         public IReadOnlyDictionary<string, string> Files { get; init; } = new Dictionary<string, string>();

@@ -41,6 +41,9 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         /// </summary>
         public static string? BuildPatchedOsu(BeatmapSetModel set, BeatmapDifficultyModel difficulty, ParsedBeatmap parsed, Edits edits)
         {
+            if (set.IsLibrarySet)
+                return Library.LibrarySaver.BuildPatched(set, difficulty, parsed, edits);
+
             string? osuPath = LazerFileStore.ResolvePath(set.DataDirectory, difficulty.OsuFileHash);
             if (osuPath == null)
                 return null;

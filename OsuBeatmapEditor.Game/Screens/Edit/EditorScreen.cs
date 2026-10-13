@@ -6854,7 +6854,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // saves) - going through the .osz importer would make lazer file the edit as a duplicate set.
             // Brand-new maps (no stored .osu yet) still round-trip through the importer.
             bool ok;
-            if (!string.IsNullOrEmpty(difficulty.OsuFileHash))
+            if (set.IsLibrarySet)
+            {
+                // App-owned library: patch the original text, check it, and replace the file with a rolling backup.
+                string? error = LibrarySaver.Save(set, difficulty, parsed, edits, pendingBackgroundPath != null);
+                ok = error == null;
+                if (!ok)
+                    toasts?.Push($"Save failed: {error}", EditorTheme.Colours.Error);
+            }
+            else if (!string.IsNullOrEmpty(difficulty.OsuFileHash))
             {
                 string? error = BeatmapRealmWriter.Save(set, difficulty, parsed, edits, pendingBackgroundPath, pendingBackgroundName);
                 ok = error == null;

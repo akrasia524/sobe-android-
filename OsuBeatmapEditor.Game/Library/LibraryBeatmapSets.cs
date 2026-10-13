@@ -37,6 +37,8 @@ namespace OsuBeatmapEditor.Game.Library
                 Author = set.Creator,
                 Difficulties = difficulties,
                 LibraryFilesDirectory = store.FilesDirectory(set.Id),
+                Library = store,
+                LibrarySetId = set.Id,
                 SearchText = $"{set.Artist} {set.Title} {set.Creator} {string.Join(" ", difficulties.Select(d => d.DifficultyName))}".ToLowerInvariant(),
                 DateAdded = set.DateAdded,
                 DateModified = set.DateModified,
