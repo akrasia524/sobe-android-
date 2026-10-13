@@ -57,3 +57,17 @@
   background image, timeline, hit objects and sliders; audio plays and the map runs when Play is pressed; the editor shows
   a computed star rating (5.59) and about 54 FPS (single screenshot, not a performance measurement).
 - Observed in the editor screenshot (not fixed, Stage C): tool/buttons and text are small for touch; layout is the desktop one.
+
+## B2.3c-2 (saving library maps) - CI verified, phone test pending
+- Commit 8ae2f51: the editor's Save on a library map goes through `LibrarySaver`: patch the ORIGINAL text with
+  `OsuFilePatcher` -> `Verify` (hit objects + timing must be intact) -> `LibraryStore.SaveDifficulty` (atomic replace + rolling
+  backup, newest 10 kept). No real change = no write and no backup. osu!lazer maps still use the old lazer save path.
+- Tests (9, in LibrarySaverTests): no-op save writes nothing and makes no backup; a combined edit (title, bookmark, moved
+  slider, timing volume) changes exactly those four lines and keeps video/storyboard/unknown keys/[CustomSection]/long
+  precision/hitsamples; backup holds the previous text; survives reopening; set-back-to-original gives the exact original file;
+  BOM + CRLF kept; dropped background refused clearly; a corrupting save is refused by the check; non-library set refused.
+- CI: 122/122 tests pass, Android build succeeds. NOT yet tested on the phone.
+- Known limits: changing/dropping a background image on a library map is refused ("not supported yet"); the set-level title
+  shown in the list is not updated when a difficulty's Title is edited (the difficulty name is); the review layer / collab /
+  video export paths for library maps are untested.
+- No UI to browse/restore backups yet (RestoreBackup exists in LibraryStore and is tested).
