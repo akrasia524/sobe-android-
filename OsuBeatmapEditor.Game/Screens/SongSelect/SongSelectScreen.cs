@@ -215,6 +215,16 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         Margin = new MarginPadding(30),
                         Action = onNewBeatmap,
                     },
+                    // Phones have no drag-and-drop, so import is a button that opens the Android file picker.
+                    new OsuButton("Import", OsuColour.Surface)
+                    {
+                        Anchor = Anchor.BottomLeft,
+                        Origin = Anchor.BottomLeft,
+                        Size = new Vector2(MobileMetrics.NewBeatmapButton.X * 0.6f, MobileMetrics.NewBeatmapButton.Y),
+                        Margin = new MarginPadding { Left = 30 + MobileMetrics.NewBeatmapButton.X + 20, Bottom = 30 },
+                        Alpha = MobileMetrics.IsMobile ? 1 : 0,
+                        Action = onImportClicked,
+                    },
                     // Top-right toolbar (search + sort), drawn above the carousel so the dropdown popup
                     // and the search box stay interactive.
                     rightArea = new Container
@@ -467,6 +477,24 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                     }
                 });
             });
+        }
+
+        private ISystemFileSelector? importSelector;
+
+        /// <summary>Opens the system file picker for an .osz / .osu and imports the chosen file.</summary>
+        private void onImportClicked()
+        {
+            importSelector?.Dispose();
+            importSelector = gameHost.CreateSystemFileSelector(new[] { ".osz", ".osu" });
+
+            if (importSelector == null)
+            {
+                toasts?.Push("This device has no file picker available", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            importSelector.Selected += file => Schedule(() => importOsz(file.FullName));
+            importSelector.Present();
         }
 
         /// <summary>Imports a dropped <c>.osz</c> into osu!lazer's realm off-thread, then toasts + refreshes.</summary>
