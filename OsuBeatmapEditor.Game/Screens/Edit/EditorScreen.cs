@@ -23,6 +23,7 @@ using osu.Framework.Screens;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using OsuBeatmapEditor.Game.Beatmaps;
+using OsuBeatmapEditor.Game.Library;
 using OsuBeatmapEditor.Game.Beatmaps.Difficulty;
 using OsuBeatmapEditor.Game.Graphics;
 using OsuBeatmapEditor.Game.UI;
@@ -405,7 +406,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // fall back to a fresh one under the standalone test browser, where no game root is loaded.
             settings = parent.Get<EditorSettings>() ?? new EditorSettings(parent.Get<GameHost>().Storage);
 
-            string? osuPath = LazerFileStore.ResolvePath(set.DataDirectory, difficulty.OsuFileHash);
+            string? osuPath = SetFileResolver.ResolveOsu(set, difficulty);
             if (osuPath != null)
                 parsed = OsuFileDecoder.Decode(osuPath);
 
@@ -6077,11 +6078,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private Track? loadTrack(AudioManager audio, GameHost host)
         {
-            if (parsed.AudioFilename.Length == 0
-                || !set.Files.TryGetValue(parsed.AudioFilename.ToLowerInvariant(), out string? hash))
-                return null;
-
-            string? audioPath = LazerFileStore.ResolvePath(set.DataDirectory, hash);
+            string? audioPath = parsed.AudioFilename.Length == 0 ? null : SetFileResolver.ResolveNamed(set, parsed.AudioFilename);
             if (audioPath == null)
                 return null;
 
@@ -6094,11 +6091,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private Texture? loadBackgroundTexture(GameHost host)
         {
-            if (parsed.BackgroundFilename.Length == 0
-                || !set.Files.TryGetValue(parsed.BackgroundFilename.ToLowerInvariant(), out string? hash))
-                return null;
-
-            string? bgPath = LazerFileStore.ResolvePath(set.DataDirectory, hash);
+            string? bgPath = parsed.BackgroundFilename.Length == 0 ? null : SetFileResolver.ResolveNamed(set, parsed.BackgroundFilename);
             if (bgPath == null)
                 return null;
 
@@ -7007,12 +7000,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             try
             {
-                if (string.IsNullOrEmpty(set.DataDirectory)
-                    || !set.Files.TryGetValue(filename.ToLowerInvariant(), out string? hash)
-                    || string.IsNullOrEmpty(hash))
-                    return null;
-
-                string? path = LazerFileStore.ResolvePath(set.DataDirectory, hash);
+                string? path = SetFileResolver.ResolveNamed(set, filename);
                 return path != null && File.Exists(path) ? File.ReadAllBytes(path) : null;
             }
             catch

@@ -23,6 +23,11 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         /// <summary>osu!lazer data directory these files live under (for resolving the content-addressable store).</summary>
         public string DataDirectory { get; init; } = string.Empty;
 
+        /// <summary>Non-empty for sets from the app-owned library: the folder holding the set's files under their real names.</summary>
+        public string LibraryFilesDirectory { get; init; } = string.Empty;
+
+        public bool IsLibrarySet => LibraryFilesDirectory.Length > 0;
+
         /// <summary>Maps a stored filename (lower-cased, e.g. the audio file) to its SHA-256 hash in the file store.</summary>
         public IReadOnlyDictionary<string, string> Files { get; init; } = new Dictionary<string, string>();
 
@@ -60,6 +65,9 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         /// Updated in place by <see cref="BeatmapRealmWriter"/> after an in-place save so the open editor's snapshot
         /// stays in sync with the realm and a subsequent save can still locate the difficulty by its current hash.</summary>
         public string OsuFileHash { get; set; } = string.Empty;
+
+        /// <summary>For app-owned library sets: this difficulty's .osu path relative to the set's files folder.</summary>
+        public string LibraryFile { get; init; } = string.Empty;
 
         /// <summary>This difficulty's background image filename (from its metadata). Empty if none.</summary>
         public string BackgroundFile { get; init; } = string.Empty;
