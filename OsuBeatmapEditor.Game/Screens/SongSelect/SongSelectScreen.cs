@@ -54,6 +54,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         private NewBeatmapOverlay newBeatmapOverlay = null!;
         private NewDifficultyOverlay newDifficultyOverlay = null!;
         private ConfirmOverlay confirmOverlay = null!;
+        private LibraryManageOverlay? manageOverlay;
         private EditorSettingsOverlay settingsOverlay = null!;
         private CollabsListOverlay collabsOverlay = null!;
         private CollabRevisionsOverlay revisionsOverlay = null!;
@@ -234,6 +235,16 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         Alpha = MobileMetrics.IsMobile ? 1 : 0,
                         Action = onImportClicked,
                     },
+                    // Phone library manager: export / trash the selected set, restore or permanently delete from the trash.
+                    new OsuButton("Library", OsuColour.Surface)
+                    {
+                        Anchor = Anchor.BottomLeft,
+                        Origin = Anchor.BottomLeft,
+                        Size = new Vector2(MobileMetrics.NewBeatmapButton.X * 0.6f, MobileMetrics.NewBeatmapButton.Y),
+                        Margin = new MarginPadding { Left = 30 + MobileMetrics.NewBeatmapButton.X + 20 + MobileMetrics.NewBeatmapButton.X * 0.6f + 20, Bottom = 30 },
+                        Alpha = MobileMetrics.IsMobile ? 1 : 0,
+                        Action = () => manageOverlay?.Show(),
+                    },
                     // Top-right toolbar (search + sort), drawn above the carousel so the dropdown popup
                     // and the search box stay interactive.
                     rightArea = new Container
@@ -333,6 +344,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                     {
                         Confirmed = onCreateDifficultyConfirmed,
                     },
+                    manageOverlay = new LibraryManageOverlay(),
                     confirmOverlay = new ConfirmOverlay(),
                     settingsOverlay = new EditorSettingsOverlay(),
                     collabsOverlay = new CollabsListOverlay
@@ -385,6 +397,15 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             carousel.CreateSetRequested = onCreateSet;
             carousel.DeleteSetRequested = onDeleteSet;
             carousel.DeleteDifficultyRequested = onDeleteDifficulty;
+            if (manageOverlay != null)
+            {
+                manageOverlay.Store = library;
+                manageOverlay.GetSelectedSetId = () => selectedSet is { IsLibrarySet: true } ? selectedSet.LibrarySetId : null;
+                manageOverlay.Notify = (m, isError) => toasts?.Push(m, isError ? EditorTheme.Colours.Error : EditorTheme.Colours.Success);
+                manageOverlay.Confirm = (t, m, label, action) => confirmOverlay.Show(t, m, label, action);
+                manageOverlay.LibraryChanged = () => reloadBeatmaps();
+                manageOverlay.ExportRequested = exportLibrarySet;
+            }
             carousel.ExportSetRequested = exportSet;
             carousel.Textures = cardTextures;
 
@@ -467,6 +488,12 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         /// <summary>Exports a set to a <c>.osz</c> off-thread, then toasts the result and reveals the file.</summary>
         private void exportSet(BeatmapSetModel set)
         {
+            if (set.IsLibrarySet)
+            {
+                exportLibrarySet(set.LibrarySetId, outcome => toasts?.Push(outcome.Message, outcome.Success ? EditorTheme.Colours.Success : EditorTheme.Colours.Error));
+                return;
+            }
+
             toasts?.Push($"Exporting {set.Artist} - {set.Title}...");
             string exportsDir = storage.GetFullPath("exports");
 
@@ -485,6 +512,23 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         toasts?.Push(error, EditorTheme.Colours.Error);
                     }
                 });
+            });
+        }
+
+        /// <summary>Exports a library set as an .osz (to Downloads on Android) off the UI thread, then reports on the UI thread.</summary>
+        private void exportLibrarySet(string setId, Action<ActionOutcome> done)
+        {
+            var lib = library;
+            if (lib == null)
+                return;
+
+            string staging = Path.Combine(lib.RootDirectory, "export-temp");
+            string fallback = Path.Combine(lib.RootDirectory, "exports");
+
+            Task.Run(() =>
+            {
+                var outcome = LibraryActions.Export(lib, setId, staging, fallback);
+                Schedule(() => done(outcome));
             });
         }
 
@@ -1086,6 +1130,23 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
         private void onDeleteSet(BeatmapSetModel set)
         {
+            if (set.IsLibrarySet && library != null)
+            {
+                var lib = library;
+                confirmOverlay.Show(
+                    "Move to trash",
+                    $"Move \"{set.Artist} - {set.Title}\" to the trash? You can restore it from the Library screen.",
+                    "Move to trash",
+                    () =>
+                    {
+                        var outcome = LibraryActions.Delete(lib, set.LibrarySetId);
+                        toasts?.Push(outcome.Message, outcome.Success ? EditorTheme.Colours.Success : EditorTheme.Colours.Error);
+                        if (outcome.Success)
+                            reloadBeatmaps();
+                    });
+                return;
+            }
+
             confirmOverlay.Show(
                 "Delete set",
                 $"Delete \"{set.Artist} - {set.Title}\" from osu!lazer? This removes all its difficulties.",
@@ -1095,6 +1156,12 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
         private void onDeleteDifficulty(BeatmapSetModel set, BeatmapDifficultyModel diff)
         {
+            if (set.IsLibrarySet)
+            {
+                toasts?.Push("Deleting a single difficulty is not supported for library maps yet", EditorTheme.Colours.Warning);
+                return;
+            }
+
             confirmOverlay.Show(
                 "Delete difficulty",
                 $"Delete the difficulty \"{diff.DifficultyName}\" from \"{set.Title}\"?",
