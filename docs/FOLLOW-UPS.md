@@ -53,4 +53,7 @@
 - NOT done: SAVING a library set. The editor's save still goes to `BeatmapRealmWriter` / `BeatmapSaver` (lazer), which on a
   phone reports an error and writes nothing (no data is lost, but edits cannot be kept yet). Next: B2.3c-2 = save through
   `OsuFilePatcher` + `LibraryStore.SaveDifficulty` (rolling backup), reading the original with `LibraryStore.ReadFileText`.
-- Device test needed for B2.3c-1: tap a library difficulty -> does the editor open, show the timeline/objects, play audio?
+- B2.3c-1 VERIFIED ON THE PHONE (user screenshot + report, 2026-10-13): a library difficulty opens in the editor with its
+  background image, timeline, hit objects and sliders; audio plays and the map runs when Play is pressed; the editor shows
+  a computed star rating (5.59) and about 54 FPS (single screenshot, not a performance measurement).
+- Observed in the editor screenshot (not fixed, Stage C): tool/buttons and text are small for touch; layout is the desktop one.
