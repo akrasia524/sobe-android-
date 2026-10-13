@@ -21,6 +21,7 @@ using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
 using OsuBeatmapEditor.Game.Beatmaps;
+using OsuBeatmapEditor.Game.Library;
 using OsuBeatmapEditor.Game.Graphics;
 using OsuBeatmapEditor.Game.Screens.Edit;
 using OsuBeatmapEditor.Game.UI;
@@ -120,6 +121,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         private EditorScreen? pushedEditor;
 
         private SongSelectPreferences prefs = null!;
+        private LibraryStore? library;
         private ScheduledDelegate? searchDebounce;
 
         // The game window, kept so the OS file-drop handler can be detached on disposal.
@@ -132,6 +134,10 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             this.storage = storage;
             gameHost = host;
             prefs = new SongSelectPreferences(storage);
+
+            // Phones use the app-owned library (see importOsz); desktop is unchanged for now.
+            if (MobileMetrics.IsMobile)
+                library = new LibraryStore(storage.GetFullPath("library", true));
 
             sets = BeatmapStore.LoadAll();
 
@@ -470,17 +476,34 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
             Task.Run(() =>
             {
-                var result = BeatmapArchiveImporter.ImportOsz(oszPath);
+                // On phones the app-owned library is the destination (osu!lazer's realm does not exist there);
+                // the desktop build keeps importing into lazer until the library migration reaches it.
+                bool success;
+                string message;
+
+                if (library != null)
+                {
+                    var outcome = LibraryImporter.ImportFile(library, oszPath);
+                    success = outcome.Success;
+                    message = outcome.Message;
+                }
+                else
+                {
+                    var result = BeatmapArchiveImporter.ImportOsz(oszPath);
+                    success = result.Success;
+                    message = result.Success ? $"Imported {result.Message}" : result.Message;
+                }
+
                 Schedule(() =>
                 {
-                    if (result.Success)
+                    if (success)
                     {
-                        toasts?.Push($"Imported {result.Message}", EditorTheme.Colours.Success);
+                        toasts?.Push(message, EditorTheme.Colours.Success);
                         reloadBeatmaps();
                     }
                     else
                     {
-                        toasts?.Push(result.Message, EditorTheme.Colours.Error);
+                        toasts?.Push(message, EditorTheme.Colours.Error);
                     }
                 });
             });
