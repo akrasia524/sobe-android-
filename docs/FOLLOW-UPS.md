@@ -46,3 +46,11 @@
 - UI-7: portrait still uses the landscape layout (list in the right half, large empty area on the left/bottom, small text).
   A real portrait layout is part of the mobile UI pass (Stage C).
 - Info panel (selected map) works for library sets: shows artist, title, difficulty, mapper. Star rating is still 0.00 (UI-4).
+
+## B2.3c status (editor + library)
+- B2.3c-1 DONE (CI only, commit b7864df): the editor finds a library set's .osu, audio, background and hitsound samples
+  through `SetFileResolver` (library folder by real name, case-insensitive, traversal-safe; osu!lazer sets unchanged).
+- NOT done: SAVING a library set. The editor's save still goes to `BeatmapRealmWriter` / `BeatmapSaver` (lazer), which on a
+  phone reports an error and writes nothing (no data is lost, but edits cannot be kept yet). Next: B2.3c-2 = save through
+  `OsuFilePatcher` + `LibraryStore.SaveDifficulty` (rolling backup), reading the original with `LibraryStore.ReadFileText`.
+- Device test needed for B2.3c-1: tap a library difficulty -> does the editor open, show the timeline/objects, play audio?
