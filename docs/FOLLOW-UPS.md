@@ -81,3 +81,14 @@
   shown in the list is not updated when a difficulty's Title is edited (the difficulty name is); the review layer / collab /
   video export paths for library maps are untested.
 - No UI to browse/restore backups yet (RestoreBackup exists in LibraryStore and is tested).
+
+## B2.3d (delete / restore / permanent delete / export for library sets) - CHECKPOINT
+- Code pushed in commit 6fa31ca. Tests CI: 138/138 passed (14 new in LibraryActionsTests). Android build for 6fa31ca: NOT yet confirmed
+  (the last confirmed Android build is for 44102ea). Not tested on the phone.
+- What exists: LibraryActions (delete = move to trash, restore, purge only for a trashed set, export .osz without set.json/backups, never
+  overwrites, numbered names); a mobile 'Library' button opening LibraryManageOverlay (export / move to trash the selected set, trash list
+  with Restore and 'Delete forever' behind a confirm); the existing right-click 'Delete set' and 'Export .osz' now work for library sets;
+  Android copies the exported .osz to Downloads/sobe via MediaStore (Android 10+).
+- Not covered by automated tests: the overlay drawing itself and the MediaStore copy (need the phone).
+- Next step: check the Android build result for 6fa31ca on branch ci-logs, then phone-test: import a set, Library > Export .osz (look in
+  Downloads/sobe), Move to trash, reopen Library > Restore, then trash again > Delete forever (confirm).
