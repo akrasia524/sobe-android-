@@ -42,9 +42,7 @@
 - Verification: phone screenshots (landscape + portrait, 2026-10-13): the first card sits fully below the search box in both.
 
 ## New observations from the portrait/landscape screenshots (not fixed)
-- UI-6: a ">_" button sits at the bottom right of the song-select screen. In landscape it is drawn over the list rows (covers
-  the "Normal" row); in portrait only a ">" edge of it is visible, cut off at the right screen edge. Not identified yet:
-  need a screenshot after tapping it (what opens?). Likely a framework/debug overlay toggle; it should not cover list rows.
+- UI-6: NOT AN APP ISSUE. The ">_" floating button is the user's own Termux overlay, not part of this app.
 - UI-7: portrait still uses the landscape layout (list in the right half, large empty area on the left/bottom, small text).
   A real portrait layout is part of the mobile UI pass (Stage C).
 - Info panel (selected map) works for library sets: shows artist, title, difficulty, mapper. Star rating is still 0.00 (UI-4).
