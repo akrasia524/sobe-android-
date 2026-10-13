@@ -120,6 +120,15 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         private string? loadedBackgroundKey;
         private EditorScreen? pushedEditor;
 
+        /// <summary>Gap between the top bar and the search row, and between the search row and the list.</summary>
+        private const float search_row_gap = 12;
+
+        /// <summary>
+        /// Where the carousel starts: below the top bar and the search row, whatever their size is on this device.
+        /// Never less than the original desktop value, so desktop layout is unchanged.
+        /// </summary>
+        private static float carouselTopInset => Math.Max(120f, TopBar.HeightPx + search_row_gap + MobileMetrics.SearchRowHeight + search_row_gap);
+
         private SongSelectPreferences prefs = null!;
         private LibraryStore? library;
         private ScheduledDelegate? searchDebounce;
@@ -196,8 +205,8 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                     carousel = new BeatmapCarousel
                     {
                         RelativeSizeAxes = Axes.Both,
-                        // Leaves room for the top bar and the search/sort toolbar below it.
-                        Padding = new MarginPadding { Top = 120, Bottom = 24 },
+                        // Leaves room for the top bar and the search/sort toolbar below it (derived from their real heights).
+                        Padding = new MarginPadding { Top = carouselTopInset, Bottom = 24 },
                         SelectionChanged = onSelectionChanged,
                     },
                     // Selected-map readout, top-left under the top bar.
@@ -233,11 +242,11 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         Origin = Anchor.TopRight,
                         Width = carousel_width - 24,
                         Height = MobileMetrics.SearchRowHeight,
-                        Margin = new MarginPadding { Top = TopBar.HeightPx + 12, Right = 24 },
+                        Margin = new MarginPadding { Top = TopBar.HeightPx + search_row_gap, Right = 24 },
                         Child = new GridContainer
                         {
                             RelativeSizeAxes = Axes.X,
-                            Height = 40,
+                            Height = MobileMetrics.SearchRowHeight,
                             ColumnDimensions = new[]
                             {
                                 new Dimension(GridSizeMode.Absolute, 22),

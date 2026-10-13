@@ -25,11 +25,18 @@
 - NOT yet device-tested: opening the set in the editor, cover images, audio preview, delete, export, New Beatmap.
 
 ## New issues seen in the screenshot (UI-3, UI-4, UI-5)
-- UI-3: the search box overlaps the first carousel card (the card's title is half hidden behind it). The carousel's top
+- UI-3 [FIXED in code, NOT yet verified on the phone]: the search box overlaps the first carousel card (the card's title is half hidden behind it). The carousel's top
   padding is a fixed 120 in `SongSelectScreen` but the mobile top bar (80) + search row (60) are taller. Use MobileMetrics.
 - UI-4: the star rating shows 0.00 for library sets (no star-rating computation is wired to the library yet).
-- UI-5: "1 difficulties" - singular/plural wording; the left info panel stays empty until a map is selected.
+- UI-5 [wording FIXED in code, not yet verified on the phone]: "1 difficulties" - singular/plural wording; the left info panel stays empty until a map is selected.
 
 ## Still unresolved
 - UI-1 (New Beatmap audio picker), UI-2 (picker at every start - needs a screenshot of it), editor open/save, delete/export,
   cover images/preview audio for library sets, baseline tags not pushed.
+
+## Fix log: search-box overlap (UI-3) and "1 difficulty" (UI-5)
+- Carousel top inset is now derived: max(120, top bar + gap + search row + gap) from the same `TopBar.HeightPx` /
+  `MobileMetrics.SearchRowHeight` constants the search row uses, so it follows the device sizing instead of a fixed 120.
+  Desktop keeps 120 (unchanged). The search grid height now matches the search box height (it was 40 vs 60 on phones).
+- "1 difficulty" / "N difficulties" in the set header.
+- Verification: CI build + tests only. Needs a phone screenshot in portrait AND landscape (first card fully below the search box).

@@ -58,7 +58,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             int diffCount = model.Difficulties.Count;
             string author = string.IsNullOrEmpty(model.Author) ? "unknown" : model.Author;
             string subtitle = isHeader
-                ? $"mapped by {author}   -   {diffCount} difficulties"
+                ? $"mapped by {author}   -   {diffCount} {(diffCount == 1 ? "difficulty" : "difficulties")}"
                 : $"mapped by {author}   -   {model.MaxStarRating:0.00}*";
 
             Children = new Drawable[]
