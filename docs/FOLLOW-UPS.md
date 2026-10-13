@@ -70,9 +70,13 @@
 - PHONE-VERIFIED (user screenshots + report, 2026-10-13): added the tag "test" in Song setup -> back -> "save changes?" prompt
   -> Save -> toast "Beatmap saved" -> reopened the map -> the tag was still there. Removing the tag and saving again also worked.
   (Backup files and the exact file text were not inspected on the phone; those are covered by the automated tests.)
-- Observed (UI-8, not fixed): Song setup shows "???" for the Artist and Title fields whose text is non-Latin (the Romanised
-  fields are fine). Most likely the UI font has no CJK glyphs, so the text box draws "?" - the stored text should be intact
-  (automated tests keep Unicode metadata unchanged on save) but this was not confirmed on the device. Needs a font fallback.
+- UI-8 (non-Latin Artist/Title showing "???"): FIXED in code, CI verified, NOT yet checked on the phone. Finding: the app shipped no fonts of
+  its own, so the framework's default font (Latin/Cyrillic/Greek) had no CJK/Hangul glyphs and drew "?". This is display only: tests
+  (UnrelatedEditKeepsUnicodeMetadataByteForByte, EditingUnicodeMetadataSavesAndReopensExactly) prove Japanese/Korean/Chinese/emoji
+  metadata is saved and re-read exactly, and an unrelated edit leaves those lines byte-identical. Fix: bundled osu!'s Noto bitmap
+  fonts (Basic, Bopomofo, CJK-Basic, CJK-Compatibility, Hangul; ~17 MB, licence file included) in OsuBeatmapEditor.Resources/Fonts/Noto and
+  registered in OsuBeatmapEditorGameBase. Not bundled: Thai. Costs about 17 MB of APK size. Caveat: if the field was ALREADY literally
+  "???" in the file (earlier tool damage), the fix cannot recover it. Phone check: open Song setup on the Japanese map.
 - Known limits: changing/dropping a background image on a library map is refused ("not supported yet"); the set-level title
   shown in the list is not updated when a difficulty's Title is edited (the difficulty name is); the review layer / collab /
   video export paths for library maps are untested.
