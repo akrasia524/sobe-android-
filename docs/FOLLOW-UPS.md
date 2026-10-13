@@ -58,7 +58,7 @@
   a computed star rating (5.59) and about 54 FPS (single screenshot, not a performance measurement).
 - Observed in the editor screenshot (not fixed, Stage C): tool/buttons and text are small for touch; layout is the desktop one.
 
-## B2.3c-2 (saving library maps) - CI verified, phone test pending
+## B2.3c-2 (saving library maps) - CI verified AND phone-tested
 - Commit 8ae2f51: the editor's Save on a library map goes through `LibrarySaver`: patch the ORIGINAL text with
   `OsuFilePatcher` -> `Verify` (hit objects + timing must be intact) -> `LibraryStore.SaveDifficulty` (atomic replace + rolling
   backup, newest 10 kept). No real change = no write and no backup. osu!lazer maps still use the old lazer save path.
@@ -66,7 +66,13 @@
   slider, timing volume) changes exactly those four lines and keeps video/storyboard/unknown keys/[CustomSection]/long
   precision/hitsamples; backup holds the previous text; survives reopening; set-back-to-original gives the exact original file;
   BOM + CRLF kept; dropped background refused clearly; a corrupting save is refused by the check; non-library set refused.
-- CI: 122/122 tests pass, Android build succeeds. NOT yet tested on the phone.
+- CI: 122/122 tests pass, Android build succeeds.
+- PHONE-VERIFIED (user screenshots + report, 2026-10-13): added the tag "test" in Song setup -> back -> "save changes?" prompt
+  -> Save -> toast "Beatmap saved" -> reopened the map -> the tag was still there. Removing the tag and saving again also worked.
+  (Backup files and the exact file text were not inspected on the phone; those are covered by the automated tests.)
+- Observed (UI-8, not fixed): Song setup shows "???" for the Artist and Title fields whose text is non-Latin (the Romanised
+  fields are fine). Most likely the UI font has no CJK glyphs, so the text box draws "?" - the stored text should be intact
+  (automated tests keep Unicode metadata unchanged on save) but this was not confirmed on the device. Needs a font fallback.
 - Known limits: changing/dropping a background image on a library map is refused ("not supported yet"); the set-level title
   shown in the list is not updated when a difficulty's Title is edited (the difficulty name is); the review layer / collab /
   video export paths for library maps are untested.
