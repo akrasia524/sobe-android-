@@ -53,6 +53,42 @@ namespace OsuBeatmapEditor.Game.DataTests
 
         private string stored(BeatmapSetModel set) => store.ReadFileText(set.LibrarySetId, file_name);
 
+        private static string metaLines(string text) => string.Join("\n", text.Replace("\r", "").Split('\n').Where(l =>
+            l.StartsWith("Title", StringComparison.Ordinal) || l.StartsWith("Artist", StringComparison.Ordinal) ||
+            l.StartsWith("Creator", StringComparison.Ordinal) || l.StartsWith("Source", StringComparison.Ordinal) ||
+            l.StartsWith("Tags", StringComparison.Ordinal)));
+
+        [Test]
+        public void UnrelatedEditKeepsUnicodeMetadataByteForByte()
+        {
+            const string original = "osu file format v14\n\n[Metadata]\nTitle:Override\nTitleUnicode:\u30c6\u30b9\u30c8 \ud55c\uae00 \u4e2d\u6587 \ud83c\udfb5\nArtist:Yoshida\nArtistUnicode:\u5409\u7530\u7f8e\u6021\nCreator:\u4f5c\u8005\nVersion:Insane\nSource:\u30b2\u30fc\u30e0\nTags:\u30c6\u30c8 tag\nBeatmapID:0\n\n[Difficulty]\nHPDrainRate:5\nCircleSize:4\nOverallDifficulty:7\nApproachRate:8\nSliderMultiplier:1.4\nSliderTickRate:1\n\n[TimingPoints]\n0,500,4,2,0,60,1,0\n\n[HitObjects]\n100,100,1000,1,0,0:0:0:0:\n";
+            var edits0 = Fixtures.EditsFor(Fixtures.Decode(original));
+            Assert.That(edits0.TitleUnicode, Does.Contain("\ud55c\uae00"), "decoder keeps non-Latin text");
+
+            var patched = Fixtures.Patch(original, (p, e) => e.Ar = 9f);
+
+            Assert.That(metaLines(patched), Is.EqualTo(metaLines(original)));
+            Assert.That(patched, Does.Contain("ApproachRate:9"));
+        }
+
+        [Test]
+        public void EditingUnicodeMetadataSavesAndReopensExactly()
+        {
+            var (set, diff, parsed, edits) = open(Fixtures.Full);
+            const string title = "\u30aa\u30fc\u30d0\u30fc\u30e9\u30a4\u30c9 \ud55c\uae00 \u4e2d\u6587 \ud83c\udfb5 \u00e9";
+            edits.TitleUnicode = title;
+            edits.ArtistUnicode = "\u5409\u7530\u7f8e\u6021";
+            edits.Tags = "\u30c6\u30b9\u30c8 tag";
+
+            Assert.That(LibrarySaver.Save(set, diff, parsed, edits, false), Is.Null);
+
+            var back = Fixtures.Decode(new LibraryStore(root).ReadFileText(set.LibrarySetId, file_name));
+            Assert.That(back.TitleUnicode, Is.EqualTo(title));
+            Assert.That(back.ArtistUnicode, Is.EqualTo("\u5409\u7530\u7f8e\u6021"));
+            Assert.That(back.Tags, Is.EqualTo("\u30c6\u30b9\u30c8 tag"));
+            Assert.That(back.Title, Is.EqualTo(Fixtures.Decode(Fixtures.Full).Title), "romanised title untouched");
+        }
+
         [Test]
         public void ASaveWithNoRealEditChangesNothingAndSpendsNoBackup()
         {

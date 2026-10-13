@@ -29,6 +29,11 @@ namespace OsuBeatmapEditor.Game
         private void load()
         {
             Resources.AddStore(new DllResourceStore(typeof(OsuBeatmapEditorResources).Assembly));
+
+            // Fallback fonts (Noto, same set osu! uses) so non-Latin metadata (CJK, Hangul) draws instead of "???".
+            // Display only: the stored text is never changed by the font.
+            foreach (var name in new[] { "Noto-Basic", "Noto-Bopomofo", "Noto-CJK-Basic", "Noto-CJK-Compatibility", "Noto-Hangul" })
+                AddFont(Resources, $@"Fonts/Noto/{name}");
         }
     }
 }
