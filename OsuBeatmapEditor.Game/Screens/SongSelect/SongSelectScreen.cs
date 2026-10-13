@@ -139,7 +139,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             if (MobileMetrics.IsMobile)
                 library = new LibraryStore(storage.GetFullPath("library", true));
 
-            sets = BeatmapStore.LoadAll();
+            sets = library != null ? LibraryBeatmapSets.ToModels(library) : BeatmapStore.LoadAll();
 
             string? dataDir = LazerStorage.FindDataDirectory();
             if (dataDir != null)
@@ -667,7 +667,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         {
             Task.Run(() =>
             {
-                var loaded = BeatmapStore.LoadAll();
+                var loaded = library != null ? LibraryBeatmapSets.ToModels(library) : BeatmapStore.LoadAll();
                 Schedule(() =>
                 {
                     sets = loaded;
