@@ -206,7 +206,7 @@ namespace OsuBeatmapEditor.Game.DataTests
             store.ExportOsz(set.Id, exported);
             exported.Position = 0;
             Assert.That(new ZipArchive(exported, ZipArchiveMode.Read, true).Entries.Select(e => e.FullName),
-                Is.EqualTo(new[] { "audio.mp3", "sb/star.png", "Test Song [Insane].osu" }));
+                Is.EqualTo(new[] { "Test Song [Insane].osu", "audio.mp3", "sb/star.png" }), "ordinal order, bookkeeping excluded");
 
             exported.Position = 0;
             string otherRoot = root + "-other";
