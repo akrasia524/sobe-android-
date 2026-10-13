@@ -25,10 +25,10 @@
 - NOT yet device-tested: opening the set in the editor, cover images, audio preview, delete, export, New Beatmap.
 
 ## New issues seen in the screenshot (UI-3, UI-4, UI-5)
-- UI-3 [FIXED in code, NOT yet verified on the phone]: the search box overlaps the first carousel card (the card's title is half hidden behind it). The carousel's top
+- UI-3 [FIXED, VERIFIED on the phone in landscape and portrait, build 316ba7a]: the search box overlaps the first carousel card (the card's title is half hidden behind it). The carousel's top
   padding is a fixed 120 in `SongSelectScreen` but the mobile top bar (80) + search row (60) are taller. Use MobileMetrics.
 - UI-4: the star rating shows 0.00 for library sets (no star-rating computation is wired to the library yet).
-- UI-5 [wording FIXED in code, not yet verified on the phone]: "1 difficulties" - singular/plural wording; the left info panel stays empty until a map is selected.
+- UI-5 [FIXED, VERIFIED on the phone: shows "1 difficulty" / "10 difficulties"]: "1 difficulties" - singular/plural wording; the left info panel stays empty until a map is selected.
 
 ## Still unresolved
 - UI-1 (New Beatmap audio picker), UI-2 (picker at every start - needs a screenshot of it), editor open/save, delete/export,
@@ -39,4 +39,12 @@
   `MobileMetrics.SearchRowHeight` constants the search row uses, so it follows the device sizing instead of a fixed 120.
   Desktop keeps 120 (unchanged). The search grid height now matches the search box height (it was 40 vs 60 on phones).
 - "1 difficulty" / "N difficulties" in the set header.
-- Verification: CI build + tests only. Needs a phone screenshot in portrait AND landscape (first card fully below the search box).
+- Verification: phone screenshots (landscape + portrait, 2026-10-13): the first card sits fully below the search box in both.
+
+## New observations from the portrait/landscape screenshots (not fixed)
+- UI-6: a ">_" button sits at the bottom right of the song-select screen. In landscape it is drawn over the list rows (covers
+  the "Normal" row); in portrait only a ">" edge of it is visible, cut off at the right screen edge. Not identified yet:
+  need a screenshot after tapping it (what opens?). Likely a framework/debug overlay toggle; it should not cover list rows.
+- UI-7: portrait still uses the landscape layout (list in the right half, large empty area on the left/bottom, small text).
+  A real portrait layout is part of the mobile UI pass (Stage C).
+- Info panel (selected map) works for library sets: shows artist, title, difficulty, mapper. Star rating is still 0.00 (UI-4).
