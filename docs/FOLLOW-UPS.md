@@ -96,3 +96,15 @@
   for library sets; Android copies the exported .osz to Downloads/sobe via MediaStore (Android 10+; older phones keep it in the app's exports folder).
 - Limits: deleting a single difficulty from a library map is not supported yet (shows a message); no backup browser yet; the exported
   .osz has not been opened in osu!droid by us (the archive contents are test-verified, a real osu!droid import is still worth trying).
+
+## UI-4 (star rating 0.00 in the song list for library maps) - CI verified (cb64a5a), NOT yet phone-tested
+- Finding: the rating algorithm already existed (StarRatingCalculator, used live by the editor), but library import/save never called it, so
+  every library difficulty stayed 0.00. UI-2 (startup picker) was reported fixed by the user earlier; no action needed.
+- Fix: LibraryStore now computes the no-mod rating when a difficulty is imported, saved, or restored from a backup, and stores it in set.json
+  (a rating failure gives 0 and never blocks an import/save). `BackfillStarRatings()` rates existing sets that have none; the song list runs it in
+  the background at start and refreshes when anything changed. The list, the info panel and the difficulty colour all read the stored value.
+- Tests: CI 171/171 (6 new in LibraryStarRatingTests: import, zero-object maps, save recalculates, backfill + persistence, backfill touches no
+  files, restore recalculates). Android build succeeded.
+- Phone test: open the app; sets imported earlier should show a non-zero rating within a few seconds (list refreshes by itself); the value on
+  the card should match the star chip shown inside the editor for the same difficulty (small rounding differences are OK). Edit a map, save, go back:
+  the rating should update. Note: this is the algorithm version pinned in StarRatingCalculator, which can differ slightly from the newest osu!.
