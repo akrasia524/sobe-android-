@@ -1,13 +1,18 @@
 # Follow-up list (not implemented yet)
 
-## UI-1: "New beatmap" pop-up has no way to choose an audio file on Android
-- Finding: `UI/NewBeatmapOverlay.cs` picks audio with the framework's in-game `BasicFileSelector`, rooted at the user
-  profile folder (desktop-style file browser squeezed into the right column). On Android that folder is the app's private
-  area and the browser is not usable on a phone, so "Create" never enables (it needs an audio path).
-- Plan: on mobile, replace that column with a "Choose audio file" button using `host.CreateSystemFileSelector(AudioExtensions)`
-  (osu!framework copies the picked content URI to a temp file; `Selected` gives the path -> existing `setAudio(path)`).
-  Copy the audio into the library straight away (the temp copy is purged on next launch). Keep `BasicFileSelector` on desktop.
-- Needs a phone test.
+## UI-1: New Beatmap audio picker on Android - CI verified, NOT yet phone-tested (build d34ef09)
+- Finding: the New Beatmap pop-up used the desktop `BasicFileSelector` (unusable on a phone), AND creating a map wrote into osu!lazer's
+  realm, which does not exist on Android - so a picker alone would still have failed at 'Create'.
+- Done: 'Choose audio file' button (Android only) -> `Intent.ACTION_GET_CONTENT` inside a chooser, so Android lists the system picker AND
+  installed file-manager apps (MainActivity.startAudioPick). The result is copied to the app cache under a safe name (display name or MIME-derived
+  extension, path parts stripped, 300 MB cap), validated (mp3/ogg/wav by extension + header check), then copied into the library's
+  `pending-audio/` area so it no longer depends on the picker's temp copy. Create builds a .osz and imports it through LibraryStore (all or
+  nothing, `LibraryCreator`); the staged copy is deleted afterwards, on cancel, or when another file is picked; leftovers are swept at start.
+- Cancel in the chooser keeps the previous choice. Errors show in the pop-up footer in red. Desktop keeps the old browser and the realm creator.
+- Tests (CI 155/155; 17 new in PickedAudioTests / LibraryCreatorTests): naming, MIME fallback, traversal stripping, validation, staging,
+  discard, sweep, create success, create failures leave no set and no temp files. NOT automated: the chooser itself and the content-URI copy.
+- Phone test: see the reply for this commit. Known limits: a file manager that returns a file:// path may be refused by Android (clear error
+  shown); star rating / cover for new maps follow UI-4 and the cover-image item.
 
 ## UI-2: an Android file picker appears before the main menu on every start
 - Finding: nothing in the app code or manifest opens a system picker at start-up (no `CreateSystemFileSelector`, no intent
