@@ -405,6 +405,13 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             {
                 // Phones: new beatmaps are created in the app library (never in osu!lazer's realm) from a copied audio file.
                 var lib = library;
+
+                // Sets imported before star ratings were stored get theirs now, in the background, then the list refreshes.
+                Task.Run(() => lib.BackfillStarRatings()).ContinueWith(t =>
+                {
+                    if (t.IsCompletedSuccessfully && t.Result > 0)
+                        Schedule(() => reloadBeatmaps());
+                });
                 newBeatmapOverlay.CreateSet = req =>
                 {
                     var outcome = LibraryCreator.Create(lib, req);

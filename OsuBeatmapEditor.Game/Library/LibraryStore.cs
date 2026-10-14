@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using OsuBeatmapEditor.Game.Beatmaps;
+using OsuBeatmapEditor.Game.Beatmaps.Difficulty;
 
 namespace OsuBeatmapEditor.Game.Library
 {
@@ -281,8 +282,81 @@ namespace OsuBeatmapEditor.Game.Library
             Audio = parsed.AudioFilename,
             Background = parsed.BackgroundFilename,
             PreviewTime = parsed.PreviewTime,
+            StarRating = computeStars(parsed),
             Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
         };
+
+        /// <summary>No-mod star rating, or 0 if it cannot be computed (a rating problem must never block an import or save).</summary>
+        private static double computeStars(ParsedBeatmap parsed)
+        {
+            try
+            {
+                double stars = StarRatingCalculator.Calculate(parsed);
+                return double.IsFinite(stars) && stars > 0 ? Math.Round(stars, 4) : 0;
+            }
+            catch (Exception)
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Computes and stores the star rating of every difficulty that has none (sets imported before ratings were stored).
+        /// Returns how many difficulties were updated. Heavy for big libraries: call it off the UI thread.
+        /// </summary>
+        public int BackfillStarRatings()
+        {
+            int updated = 0;
+            List<string> ids;
+            lock (gate) ids = index.Values.Where(r => r.Difficulties.Any(d => d.StarRating <= 0)).Select(r => r.Id).ToList();
+
+            foreach (string id in ids)
+            {
+                // Parse and rate outside the lock; re-check and write inside it.
+                var todo = new List<(string file, string sha, double stars)>();
+                List<(string file, string sha)> pending;
+                lock (gate)
+                    pending = index.TryGetValue(id, out var r0) ? r0.Difficulties.Where(d => d.StarRating <= 0).Select(d => (d.File, d.Sha256)).ToList() : new();
+
+                foreach (var (file, sha) in pending)
+                {
+                    try
+                    {
+                        double stars = computeStars(OsuFileDecoder.Decode(new StringReader(ReadFileText(id, file))));
+                        if (stars > 0)
+                            todo.Add((file, sha, stars));
+                    }
+                    catch (Exception e) when (e is IOException or LibraryException or UnauthorizedAccessException)
+                    {
+                    }
+                }
+
+                if (todo.Count == 0)
+                    continue;
+
+                lock (gate)
+                {
+                    if (!index.TryGetValue(id, out var record))
+                        continue;
+
+                    bool changed = false;
+                    foreach (var (file, sha, stars) in todo)
+                    {
+                        var diff = record.Difficulties.FirstOrDefault(d => d.File == file);
+                        if (diff == null || diff.Sha256 != sha) // edited meanwhile: the save already computed a fresh rating
+                            continue;
+                        diff.StarRating = stars;
+                        changed = true;
+                        updated++;
+                    }
+
+                    if (changed)
+                        writeRecord(setDir(id), record);
+                }
+            }
+
+            return updated;
+        }
 
         /// <summary>Hash over every file's name and content, independent of the order they were read in.</summary>
         public static string ComputeContentHash(string filesDir)
@@ -357,6 +431,7 @@ namespace OsuBeatmapEditor.Game.Library
                 diff.Audio = updated.Audio;
                 diff.Background = updated.Background;
                 diff.PreviewTime = updated.PreviewTime;
+                diff.StarRating = updated.StarRating;
                 diff.Sha256 = updated.Sha256;
                 record.DateModified = clock();
                 writeRecord(setDir(setId), record);
