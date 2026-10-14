@@ -155,18 +155,22 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
             sets = library != null ? LibraryBeatmapSets.ToModels(library) : BeatmapStore.LoadAll();
 
+            // Where cover images and preview audio come from: the app library on phones, osu!lazer's hash store on desktop.
             string? dataDir = LazerStorage.FindDataDirectory();
-            if (dataDir != null)
+            IResourceStore<byte[]>? contentStore = library != null
+                ? new LibraryResourceStore(library)
+                : dataDir != null ? new StorageBackedResourceStore(new NativeStorage(Path.Combine(dataDir, "files"), host)) : null;
+
+            if (contentStore != null)
             {
-                var fileStore = new StorageBackedResourceStore(new NativeStorage(Path.Combine(dataDir, "files"), host));
                 // Full-resolution store for the screen-filling hero background (it covers the whole window).
-                textures = new LargeTextureStore(host.Renderer, host.CreateTextureLoaderStore(fileStore), TextureFilteringMode.Linear, false);
+                textures = new LargeTextureStore(host.Renderer, host.CreateTextureLoaderStore(contentStore), TextureFilteringMode.Linear, false);
                 // Separate store for the carousel cards: those only ever show the background in a small panel, so
                 // downscaling the longest side to 640px before upload keeps their combined VRAM a fraction of the
                 // full-resolution art - with no visible quality loss at card size. The hero keeps full detail.
-                var cardLoader = new DownscalingTextureLoaderStore(host.CreateTextureLoaderStore(fileStore), 640);
+                var cardLoader = new DownscalingTextureLoaderStore(host.CreateTextureLoaderStore(contentStore), 640);
                 cardTextures = new LargeTextureStore(host.Renderer, cardLoader, TextureFilteringMode.Linear, false);
-                trackStore = audio.GetTrackStore(new StorageBackedResourceStore(new NativeStorage(Path.Combine(dataDir, "files"), host)));
+                trackStore = audio.GetTrackStore(contentStore);
             }
 
             ThemedDropdown<SortMode> sortDropdown;

@@ -6,9 +6,8 @@ namespace OsuBeatmapEditor.Game.Library
 {
     /// <summary>
     /// Presents the app-owned library to the existing song-select UI by converting <see cref="SetRecord"/>s into the
-    /// <see cref="BeatmapSetModel"/>s it already understands. Covers listing data only: star rating is 0 and the
-    /// lazer-style hashed file maps are empty, so cover images, audio previews and opening in the editor are
-    /// separate, later stages.
+    /// <see cref="BeatmapSetModel"/>s it already understands. Background and audio files are addressed through
+    /// <see cref="LibraryResourceStore"/> so cover images and the audio preview work too.
     /// </summary>
     public static class LibraryBeatmapSets
     {
@@ -29,6 +28,17 @@ namespace OsuBeatmapEditor.Game.Library
                 PreviewTime = d.PreviewTime,
             }).ToList();
 
+            // The background and audio files the list needs, addressed so LibraryResourceStore can open them (no disk access here).
+            var files = new Dictionary<string, string>();
+            foreach (var d in set.Difficulties)
+            {
+                foreach (string name in new[] { d.Background, d.Audio })
+                {
+                    if (!string.IsNullOrEmpty(name))
+                        files[name.ToLowerInvariant()] = LibraryResourceStore.KeyFor(set.Id, name);
+                }
+            }
+
             return new BeatmapSetModel
             {
                 OnlineID = set.OnlineSetId,
@@ -36,6 +46,7 @@ namespace OsuBeatmapEditor.Game.Library
                 Artist = set.Artist,
                 Author = set.Creator,
                 Difficulties = difficulties,
+                Files = files,
                 LibraryFilesDirectory = store.FilesDirectory(set.Id),
                 Library = store,
                 LibrarySetId = set.Id,
