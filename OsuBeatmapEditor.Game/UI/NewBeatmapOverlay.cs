@@ -310,23 +310,47 @@ namespace OsuBeatmapEditor.Game.UI
                 return;
             }
 
-            string path = result.Path;
+            string picked = result.Path;
+            showStatus("Reading audio file...", false);
 
-            if (StageAudio != null)
+            // Copying (up to hundreds of MB) and reading tags must not block the UI thread.
+            Task.Run(() =>
             {
-                var staged = StageAudio(path);
-                tryDelete(path); // the picker's temporary copy is no longer needed either way
-                if (staged.Path == null)
+                string path = picked;
+                string? error = null;
+
+                if (StageAudio != null)
                 {
-                    showStatus(staged.Error ?? "Could not use that file.", true);
-                    return;
+                    var staged = StageAudio(picked);
+                    tryDelete(picked); // the picker's temporary copy is no longer needed either way
+                    if (staged.Path == null)
+                        error = staged.Error ?? "Could not use that file.";
+                    else
+                        path = staged.Path;
+                }
+                else
+                {
+                    error = PickedAudio.Validate(path);
                 }
 
-                path = staged.Path;
-            }
-            else if (PickedAudio.Validate(path) is { } problem)
+                var tags = error == null ? AudioTags.Read(path) : new AudioTagInfo(null, null);
+                Schedule(() => applyPickedAudio(path, error, tags));
+            });
+        }
+
+        private void applyPickedAudio(string path, string? error, AudioTagInfo tags)
+        {
+            if (error != null)
             {
-                showStatus(problem, true);
+                showStatus(error, true);
+                return;
+            }
+
+            if (!IsLoaded || State.Value == Visibility.Hidden)
+            {
+                // The dialog was dismissed while the file was being read: don't keep an orphaned copy.
+                if (StageAudio != null)
+                    DiscardAudio?.Invoke(path);
                 return;
             }
 
@@ -336,7 +360,46 @@ namespace OsuBeatmapEditor.Game.UI
 
             setAudio(path);
             showStatus("Audio selected: " + Path.GetFileName(path), false);
-            guessMetadata(path);
+            fillMetadata(path, tags);
+        }
+
+        // What we last typed into Artist / Title ourselves: a new pick may replace those, never text the user wrote.
+        private string? autoArtist, autoTitle;
+
+        private void setAuto(FormField field, ref string? remembered, string? value)
+        {
+            string current = field.Current.Value;
+            if (value == null || (current.Length > 0 && current != remembered))
+                return;
+
+            field.Current.Value = value;
+            remembered = value;
+        }
+
+        /// <summary>
+        /// Artist / Title from the file's own tags when it has any (the file name is often "Title - Vocaloid" or similar, so it is
+        /// not trusted first). Only a tag-less file falls back to the "Artist - Title" file-name convention.
+        /// </summary>
+        private void fillMetadata(string path, AudioTagInfo tags)
+        {
+            if (tags.HasAny)
+            {
+                setAuto(artistField, ref autoArtist, tags.Artist);
+                setAuto(titleField, ref autoTitle, tags.Title);
+                return;
+            }
+
+            string stem = Path.GetFileNameWithoutExtension(path);
+            int dash = stem.IndexOf(" - ", StringComparison.Ordinal);
+            if (dash > 0)
+            {
+                setAuto(artistField, ref autoArtist, stem[..dash].Trim());
+                setAuto(titleField, ref autoTitle, stem[(dash + 3)..].Trim());
+            }
+            else
+            {
+                setAuto(titleField, ref autoTitle, stem.Trim());
+            }
         }
 
         private void showStatus(string text, bool error)
@@ -372,6 +435,27 @@ namespace OsuBeatmapEditor.Game.UI
             }));
         }
 
+        /// <summary>Back to a blank form: metadata, chosen audio, seeded data and any message. Used whenever the dialog closes or opens.</summary>
+        private void resetForm()
+        {
+            discardStaged();
+
+            artistField.Current.Value = string.Empty;
+            titleField.Current.Value = string.Empty;
+            creatorField.Current.Value = string.Empty;
+            difficultyField.Current.Value = "Normal";
+            bpmField.Current.Value = "120";
+
+            audioPath = null;
+            seededAudioFileName = null;
+            seededTimingLines = null;
+            autoArtist = autoTitle = null;
+
+            setAudioLabel("No audio selected");
+            statusText.Text = string.Empty;
+            validate();
+        }
+
         /// <summary>Drops the staged audio copy and forgets the chosen file (the set already has its own copy, or was cancelled).</summary>
         private void clearStagedAudio()
         {
@@ -395,24 +479,6 @@ namespace OsuBeatmapEditor.Game.UI
         {
             try { File.Delete(path); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
-        }
-
-        /// <summary>Fills empty Artist / Title from an "Artist - Title" file name.</summary>
-        private void guessMetadata(string path)
-        {
-            string stem = Path.GetFileNameWithoutExtension(path);
-            int dash = stem.IndexOf(" - ", StringComparison.Ordinal);
-            if (dash > 0)
-            {
-                if (artistField.Current.Value.Length == 0)
-                    artistField.Current.Value = stem[..dash].Trim();
-                if (titleField.Current.Value.Length == 0)
-                    titleField.Current.Value = stem[(dash + 3)..].Trim();
-            }
-            else if (titleField.Current.Value.Length == 0)
-            {
-                titleField.Current.Value = stem.Trim();
-            }
         }
 
         private Drawable buildAudioChip() => new Container
@@ -494,8 +560,7 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Opens the dialog for a brand-new map (clears any seeded audio/timing from a prior "new set").</summary>
         public void ShowForNewBeatmap()
         {
-            seededAudioFileName = null;
-            seededTimingLines = null;
+            resetForm();
             Show();
         }
 
@@ -505,7 +570,7 @@ namespace OsuBeatmapEditor.Game.UI
         /// </summary>
         public void ShowForDroppedAudio(string path)
         {
-            seededTimingLines = null;
+            resetForm();
             setAudio(path);
 
             string stem = Path.GetFileNameWithoutExtension(path);
@@ -532,6 +597,7 @@ namespace OsuBeatmapEditor.Game.UI
         public void ShowSeeded(string artist, string title, string creator, string audioStorePath,
                                string audioFileName, System.Collections.Generic.IReadOnlyList<string> timingLines, double bpm)
         {
+            resetForm();
             artistField.Current.Value = artist;
             titleField.Current.Value = title;
             creatorField.Current.Value = creator;
@@ -606,7 +672,7 @@ namespace OsuBeatmapEditor.Game.UI
         protected override void PopOut()
         {
             if (!creating)
-                clearStagedAudio();
+                resetForm(); // cancelled or finished: nothing typed here is kept for the next time
 
             this.FadeOut(EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
             panel.ScaleTo(0.96f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
