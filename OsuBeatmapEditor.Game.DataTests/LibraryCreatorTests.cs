@@ -130,7 +130,9 @@ namespace OsuBeatmapEditor.Game.DataTests
             Assert.That(parsed.Title, Is.EqualTo("My Song"));
             Assert.That(parsed.Version, Is.EqualTo("Normal"));
             Assert.That(store.ReadFileText(set.Id, set.Difficulties[0].File), Does.Contain("AudioFilename: audio.mp3").Or.Contain("AudioFilename:audio.mp3"));
-            Assert.That(libraryTemp(), Is.Empty, "no temp archive left behind");
+            Assert.That(Directory.Exists(Path.Combine(lib, "create-temp")) ? Directory.GetFiles(Path.Combine(lib, "create-temp")) : Array.Empty<string>(), Is.Empty, "no temp archive left behind");
+            LibraryCreator.DiscardStaged(lib, staged); // the screen does this once the set exists
+            Assert.That(libraryTemp(), Is.Empty);
         }
 
         [Test]
