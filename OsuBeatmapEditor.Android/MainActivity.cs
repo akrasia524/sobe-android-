@@ -26,6 +26,7 @@ namespace OsuBeatmapEditor.Android
             NativeLibraries.Preload(this);
             base.OnCreate(savedInstanceState);
             LibraryActions.Publisher = publishToDownloads;
+            PlatformPicker.PickAudio = startAudioPick;
         }
 
         /// <summary>
@@ -66,6 +67,123 @@ namespace OsuBeatmapEditor.Android
 
                 return null;
             }
+        }
+
+        private const int audio_pick_request = 0x50AD;
+        private System.Action<PickResult>? pendingAudioPick;
+
+        /// <summary>
+        /// Opens Android's chooser for one audio file. GET_CONTENT inside a chooser lists the system picker and every installed
+        /// file manager that supports it (the plain system picker alone makes searching hard).
+        /// </summary>
+        private void startAudioPick(System.Action<PickResult> done)
+        {
+            pendingAudioPick = done;
+
+            try
+            {
+                var intent = new Intent(Intent.ActionGetContent);
+                intent.AddCategory(Intent.CategoryOpenable);
+                intent.SetType("*/*");
+                intent.PutExtra(Intent.ExtraMimeTypes, new[] { "audio/*", "application/ogg" });
+                intent.PutExtra(Intent.ExtraAllowMultiple, false);
+
+                StartActivityForResult(Intent.CreateChooser(intent, "Choose audio file"), audio_pick_request);
+            }
+            catch (System.Exception e)
+            {
+                pendingAudioPick = null;
+                done(new PickResult(null, "Could not open a file chooser: " + e.Message));
+            }
+        }
+
+        protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+        {
+            if (requestCode != audio_pick_request)
+            {
+                base.OnActivityResult(requestCode, resultCode, data);
+                return;
+            }
+
+            var done = pendingAudioPick;
+            pendingAudioPick = null;
+            if (done == null)
+                return;
+
+            var uri = data?.Data ?? data?.ClipData?.GetItemAt(0)?.Uri;
+            if (resultCode != Result.Ok || uri == null)
+            {
+                done(new PickResult(null, null)); // cancelled
+                return;
+            }
+
+            // Copy while the temporary read permission is still valid; do it off the UI thread (files can be large).
+            System.Threading.Tasks.Task.Run(() => done(copyPickedAudio(uri)));
+        }
+
+        /// <summary>Copies the chosen document into the app cache under a safe name. Never touches the original.</summary>
+        private PickResult copyPickedAudio(global::Android.Net.Uri uri)
+        {
+            string? dir = null;
+
+            try
+            {
+                string? displayName = null;
+                using (var cursor = ContentResolver!.Query(uri, new[] { "_display_name" }, null, null, null))
+                {
+                    if (cursor != null && cursor.MoveToFirst())
+                        displayName = cursor.GetString(0);
+                }
+
+                string name = PickedAudio.ResolveFileName(displayName, ContentResolver.GetType(uri), uri.LastPathSegment);
+
+                dir = System.IO.Path.Combine(CacheDir!.AbsolutePath, "audio-pick", System.Guid.NewGuid().ToString("N"));
+                System.IO.Directory.CreateDirectory(dir);
+                string target = System.IO.Path.Combine(dir, name);
+
+                using (var input = ContentResolver.OpenInputStream(uri))
+                {
+                    if (input == null)
+                        return new PickResult(null, "The chosen app did not provide the file.");
+
+                    using var output = System.IO.File.Create(target);
+                    byte[] buffer = new byte[81920];
+                    long total = 0;
+                    int n;
+
+                    while ((n = input.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        total += n;
+                        if (total > PickedAudio.MAX_BYTES)
+                            throw new System.IO.IOException($"the file is larger than {PickedAudio.MAX_BYTES / 1024 / 1024} MB");
+
+                        output.Write(buffer, 0, n);
+                    }
+                }
+
+                string? problem = PickedAudio.Validate(target);
+                if (problem != null)
+                {
+                    tryDeleteDir(dir);
+                    return new PickResult(null, problem);
+                }
+
+                return new PickResult(target, null);
+            }
+            catch (System.Exception e)
+            {
+                tryDeleteDir(dir);
+                return new PickResult(null, "Could not read the chosen file: " + e.Message);
+            }
+        }
+
+        private static void tryDeleteDir(string? dir)
+        {
+            if (dir == null)
+                return;
+
+            try { System.IO.Directory.Delete(dir, true); }
+            catch (System.Exception) { }
         }
 
         protected override osu.Framework.Game CreateGame() => new OsuBeatmapEditorGame();

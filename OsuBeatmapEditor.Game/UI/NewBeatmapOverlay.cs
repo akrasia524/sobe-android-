@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -11,6 +12,7 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using OsuBeatmapEditor.Game.Beatmaps;
 using OsuBeatmapEditor.Game.Graphics;
+using OsuBeatmapEditor.Game.Library;
 using osuTK;
 using osuTK.Input;
 
@@ -33,7 +35,22 @@ namespace OsuBeatmapEditor.Game.UI
         private FormField creatorField = null!;
         private FormField difficultyField = null!;
         private FormField bpmField = null!;
-        private BasicFileSelector fileSelector = null!;
+        private BasicFileSelector? fileSelector;
+
+        /// <summary>
+        /// When set (Android), creating a beatmap goes here instead of osu!lazer's realm: returns an error message, or null on
+        /// success. It runs off the UI thread.
+        /// </summary>
+        public Func<NewBeatmapRequest, string?>? CreateSet { get; set; }
+
+        /// <summary>Called with a staged audio path when it is no longer needed (cancelled, replaced or created).</summary>
+        public Action<string>? DiscardAudio { get; set; }
+
+        /// <summary>Copies a picked audio file into app storage; returns the new path or an error. Null = use the picked path as is.</summary>
+        public Func<string, (string? Path, string? Error)>? StageAudio { get; set; }
+
+        private string? stagedAudio;
+        private bool creating;
         private Box audioChipBackground = null!;
         private SpriteText audioChipText = null!;
         private SpriteText statusText = null!;
@@ -110,7 +127,7 @@ namespace OsuBeatmapEditor.Game.UI
             titleField.Current.ValueChanged += _ => validate();
             bpmField.Current.ValueChanged += _ => validate();
 
-            fileSelector.CurrentFile.BindValueChanged(e =>
+            fileSelector?.CurrentFile.BindValueChanged(e =>
             {
                 if (e.NewValue == null)
                     return;
@@ -210,7 +227,7 @@ namespace OsuBeatmapEditor.Game.UI
                             },
                             new SpriteText
                             {
-                                Text = "Drag a file onto the window, or browse below  (mp3 / ogg / wav)",
+                                Text = PlatformPicker.PickAudio != null ? "mp3 / ogg / wav" : "Drag a file onto the window, or browse below  (mp3 / ogg / wav)",
                                 Colour = EditorTheme.Colours.TextFaint,
                                 Font = EditorTheme.Type.Caption(),
                             },
@@ -220,8 +237,12 @@ namespace OsuBeatmapEditor.Game.UI
                 new Drawable?[] { null },
                 new Drawable?[] { buildAudioChip() },
                 new Drawable?[] { null },
-                new Drawable?[]
-                {
+                new Drawable?[] { PlatformPicker.PickAudio != null ? buildPickerPanel() : buildDesktopBrowser() },
+            },
+        };
+
+        /// <summary>Desktop: the in-game file browser (unchanged).</summary>
+        private Drawable buildDesktopBrowser() =>
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -243,10 +264,156 @@ namespace OsuBeatmapEditor.Game.UI
                                 RelativeSizeAxes = Axes.Both,
                             },
                         },
-                    },
+                    };
+
+        /// <summary>Android: one big button that opens the chooser (system picker plus installed file managers).</summary>
+        private Drawable buildPickerPanel() => new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Spacing = new Vector2(0, EditorTheme.Spacing.Lg),
+            Children = new Drawable[]
+            {
+                new OsuButton("Choose audio file", OsuColour.Pink)
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = MobileMetrics.Pick(48, 72),
+                    Action = onChooseAudio,
+                },
+                new SpriteText
+                {
+                    Text = "Opens Android's chooser. You can use the built-in picker or a file manager app.",
+                    Colour = EditorTheme.Colours.TextFaint,
+                    Font = EditorTheme.Type.Caption(),
                 },
             },
         };
+
+        private void onChooseAudio()
+        {
+            var pick = PlatformPicker.PickAudio;
+            if (pick == null || creating)
+                return;
+
+            pick(result => Schedule(() => onAudioPicked(result)));
+        }
+
+        private void onAudioPicked(PickResult result)
+        {
+            if (result.Cancelled)
+                return; // the user backed out of the chooser: keep whatever was chosen before
+
+            if (result.Path == null)
+            {
+                showStatus(result.Error ?? "Could not open that file.", true);
+                return;
+            }
+
+            string path = result.Path;
+
+            if (StageAudio != null)
+            {
+                var staged = StageAudio(path);
+                tryDelete(path); // the picker's temporary copy is no longer needed either way
+                if (staged.Path == null)
+                {
+                    showStatus(staged.Error ?? "Could not use that file.", true);
+                    return;
+                }
+
+                path = staged.Path;
+            }
+            else if (PickedAudio.Validate(path) is { } problem)
+            {
+                showStatus(problem, true);
+                return;
+            }
+
+            discardStaged();
+            if (StageAudio != null)
+                stagedAudio = path;
+
+            setAudio(path);
+            showStatus("Audio selected: " + Path.GetFileName(path), false);
+            guessMetadata(path);
+        }
+
+        private void showStatus(string text, bool error)
+        {
+            statusText.Colour = error ? EditorTheme.Colours.Error : EditorTheme.Colours.TextMuted;
+            statusText.Text = text;
+        }
+
+        /// <summary>Android: creates the set in the app library off the UI thread; nothing is added if it fails.</summary>
+        private void createInLibrary(NewBeatmapRequest request)
+        {
+            var create = CreateSet!;
+            creating = true;
+            createButton.Enabled.Value = false;
+            showStatus("Creating...", false);
+
+            Task.Run(() => create(request)).ContinueWith(t => Schedule(() =>
+            {
+                creating = false;
+                string? error = t.IsFaulted ? t.Exception?.GetBaseException().Message ?? "unknown error" : t.Result;
+
+                if (error != null)
+                {
+                    showStatus("Failed: " + error, true);
+                    validate(); // the form and the chosen audio stay as they were so the user can retry
+                    return;
+                }
+
+                showStatus("Beatmap created.", false);
+                clearStagedAudio();
+                Created?.Invoke(request);
+                Scheduler.AddDelayed(Hide, 600);
+            }));
+        }
+
+        /// <summary>Drops the staged audio copy and forgets the chosen file (the set already has its own copy, or was cancelled).</summary>
+        private void clearStagedAudio()
+        {
+            if (stagedAudio == null)
+                return;
+
+            discardStaged();
+            audioPath = null;
+            setAudioLabel("No audio selected");
+            validate();
+        }
+
+        private void discardStaged()
+        {
+            if (stagedAudio != null)
+                DiscardAudio?.Invoke(stagedAudio);
+            stagedAudio = null;
+        }
+
+        private static void tryDelete(string path)
+        {
+            try { File.Delete(path); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        }
+
+        /// <summary>Fills empty Artist / Title from an "Artist - Title" file name.</summary>
+        private void guessMetadata(string path)
+        {
+            string stem = Path.GetFileNameWithoutExtension(path);
+            int dash = stem.IndexOf(" - ", StringComparison.Ordinal);
+            if (dash > 0)
+            {
+                if (artistField.Current.Value.Length == 0)
+                    artistField.Current.Value = stem[..dash].Trim();
+                if (titleField.Current.Value.Length == 0)
+                    titleField.Current.Value = stem[(dash + 3)..].Trim();
+            }
+            else if (titleField.Current.Value.Length == 0)
+            {
+                titleField.Current.Value = stem.Trim();
+            }
+        }
 
         private Drawable buildAudioChip() => new Container
         {
@@ -403,9 +570,18 @@ namespace OsuBeatmapEditor.Game.UI
 
         private void onCreate()
         {
+            if (creating)
+                return;
+
             var request = buildRequest();
             if (!request.IsValid)
                 return;
+
+            if (CreateSet != null)
+            {
+                createInLibrary(request);
+                return;
+            }
 
             // Write the new set straight into osu!lazer's realm + file store (no importer, no launch).
             string? error = BeatmapRealmCreator.CreateSet(request);
@@ -429,6 +605,9 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override void PopOut()
         {
+            if (!creating)
+                clearStagedAudio();
+
             this.FadeOut(EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
             panel.ScaleTo(0.96f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
             panel.MoveToY(20, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);

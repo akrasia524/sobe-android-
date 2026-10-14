@@ -147,7 +147,11 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
             // Phones use the app-owned library (see importOsz); desktop is unchanged for now.
             if (MobileMetrics.IsMobile)
-                library = new LibraryStore(storage.GetFullPath("library", true));
+            {
+                string libraryRoot = storage.GetFullPath("library", true);
+                LibraryCreator.SweepLeftovers(libraryRoot); // half-finished picks / exports from an earlier run
+                library = new LibraryStore(libraryRoot);
+            }
 
             sets = library != null ? LibraryBeatmapSets.ToModels(library) : BeatmapStore.LoadAll();
 
@@ -397,6 +401,19 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             carousel.CreateSetRequested = onCreateSet;
             carousel.DeleteSetRequested = onDeleteSet;
             carousel.DeleteDifficultyRequested = onDeleteDifficulty;
+            if (library != null)
+            {
+                // Phones: new beatmaps are created in the app library (never in osu!lazer's realm) from a copied audio file.
+                var lib = library;
+                newBeatmapOverlay.CreateSet = req =>
+                {
+                    var outcome = LibraryCreator.Create(lib, req);
+                    return outcome.Success ? null : outcome.Message;
+                };
+                newBeatmapOverlay.StageAudio = path => LibraryCreator.StageAudio(lib.RootDirectory, path);
+                newBeatmapOverlay.DiscardAudio = path => LibraryCreator.DiscardStaged(lib.RootDirectory, path);
+            }
+
             if (manageOverlay != null)
             {
                 manageOverlay.Store = library;
