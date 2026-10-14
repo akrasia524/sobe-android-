@@ -108,3 +108,17 @@
 - Phone test: open the app; sets imported earlier should show a non-zero rating within a few seconds (list refreshes by itself); the value on
   the card should match the star chip shown inside the editor for the same difficulty (small rounding differences are OK). Edit a map, save, go back:
   the rating should update. Note: this is the algorithm version pinned in StarRatingCalculator, which can differ slightly from the newest osu!.
+
+## Cover images + audio preview for library sets - CI verified (cbdd35e), NOT yet phone-tested
+- Finding: the song list builds its texture and audio stores only from osu!lazer's hash-addressed file store (null on Android), and looks
+  files up through `set.Files` (name -> hash). Library sets had empty `Files`, so no card/hero background and no preview.
+- Fix (small, no UI rewrite): `LibraryResourceStore` (read-only IResourceStore<byte[]>) serves library files for the same `a/ab/<key>` style
+  lookups; `LibraryBeatmapSets` fills `Files` with a key per difficulty background/audio (no disk access while listing); `SongSelectScreen`
+  builds the full-size texture store, the 640px card store and the track store from it on phones. Desktop/lazer path is the same code as before.
+  Safety: names are parsed and resolved with the existing traversal-safe `SetFileResolver.ResolveInFolder`; trashed sets serve nothing.
+- Preview point: uses the map's PreviewTime, else 40% into the track (as before).
+- Tests: CI 178/178 (7 new in LibraryResourceStoreTests). The real image/audio decoding and playback are NOT covered by tests (phone needed).
+- Phone test: open the song list. Cards with a background should show their image, the selected map's background should fill the screen,
+  and music should start from the preview point when you select a map (Ctrl+Space-style pause button in the playback card toggles it).
+  Check a map WITHOUT a background (no image, no crash), a big image, and a map with a mixed-case file name. Report memory/lag with many sets.
+- Known gap: the editor's own audio/background loading for library sets was already working (B2.3c). Changing a library map's background is still refused.
