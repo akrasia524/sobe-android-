@@ -1,18 +1,18 @@
 # Follow-up list (not implemented yet)
 
-## UI-1: New Beatmap audio picker on Android - CI verified, NOT yet phone-tested (build d34ef09)
-- Finding: the New Beatmap pop-up used the desktop `BasicFileSelector` (unusable on a phone), AND creating a map wrote into osu!lazer's
-  realm, which does not exist on Android - so a picker alone would still have failed at 'Create'.
-- Done: 'Choose audio file' button (Android only) -> `Intent.ACTION_GET_CONTENT` inside a chooser, so Android lists the system picker AND
-  installed file-manager apps (MainActivity.startAudioPick). The result is copied to the app cache under a safe name (display name or MIME-derived
-  extension, path parts stripped, 300 MB cap), validated (mp3/ogg/wav by extension + header check), then copied into the library's
-  `pending-audio/` area so it no longer depends on the picker's temp copy. Create builds a .osz and imports it through LibraryStore (all or
-  nothing, `LibraryCreator`); the staged copy is deleted afterwards, on cancel, or when another file is picked; leftovers are swept at start.
-- Cancel in the chooser keeps the previous choice. Errors show in the pop-up footer in red. Desktop keeps the old browser and the realm creator.
-- Tests (CI 155/155; 17 new in PickedAudioTests / LibraryCreatorTests): naming, MIME fallback, traversal stripping, validation, staging,
-  discard, sweep, create success, create failures leave no set and no temp files. NOT automated: the chooser itself and the content-URI copy.
-- Phone test: see the reply for this commit. Known limits: a file manager that returns a file:// path may be refused by Android (clear error
-  shown); star rating / cover for new maps follow UI-4 and the cover-image item.
+## UI-1: New Beatmap audio picker on Android - phone-tested (d34ef09); follow-up fixes CI verified in 57f793f, NOT yet phone-tested
+- d34ef09 phone result (user, 2026-10-14): chooser lists every installed file manager, picking works, .jpg/.txt show a clear 'not supported'
+  message, Create works. Three problems were reported and are fixed in 57f793f:
+  1. Artist/Title were guessed from the file name ('Title - Vocaloid' became Artist/Title wrongly). Now the file's own tags are used first
+     (ID3v2.2/2.3/2.4, ID3v1, Vorbis and Opus comments; `AudioTags`); only a tag-less file falls back to the 'Artist - Title' file-name rule.
+     A later pick replaces text we filled in ourselves, never text the user typed. Tags stored in a legacy code page (e.g. Shift-JIS in an
+     ID3 'Latin-1' field) cannot be detected and may show as odd characters - the user can edit them.
+  2. After Create the old metadata and 'Beatmap created.' stayed. 3. After Cancel the metadata and 'Audio selected' stayed.
+     Both: the form is now reset (Artist, Title, Creator blank; Difficulty 'Normal'; BPM 120; audio, message and staged copy cleared)
+     whenever the dialog closes (Cancel, click outside, or after Create) and again when it opens.
+- Also: copying the picked file and reading its tags now run off the UI thread ('Reading audio file...' is shown meanwhile).
+- Tests: CI 165/165 (10 new AudioTagsTests: ID3v2.2/2.3/2.4, UTF-16/UTF-8, NUL-separated values, ID3v1, Vorbis, Opus, multi-page cover-art tags,
+  garbage / truncated files never throw). The form reset itself is UI code and needs the phone.
 
 ## UI-2: an Android file picker appears before the main menu on every start
 - Finding: nothing in the app code or manifest opens a system picker at start-up (no `CreateSystemFileSelector`, no intent
