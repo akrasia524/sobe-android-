@@ -122,3 +122,16 @@
   and music should start from the preview point when you select a map (Ctrl+Space-style pause button in the playback card toggles it).
   Check a map WITHOUT a background (no image, no crash), a big image, and a map with a mixed-case file name. Report memory/lag with many sets.
 - Known gap: the editor's own audio/background loading for library sets was already working (B2.3c). Changing a library map's background is still refused.
+
+## BUG-1: crash when tapping between maps 2-3 times quickly (preview audio) - fix CI verified (c2c1e1a), NOT yet phone-tested
+- Phone report (2026-10-15): NullReferenceException inside osu.Framework `TrackBass.seekInternal`, reached from `PreviewTrack.StartPreviewAt`
+  (SongSelectScreen), after the library audio preview was added. The cause inside the framework's audio thread is not visible from our code
+  and could not be reproduced here (no device); the likely trigger is several preview tracks being created and disposed back-to-back while
+  the previous one is still loading.
+- Fix (two layers, no behaviour change when things work): 1) preview loading is debounced - the track for a map is only loaded once the
+  selection has stayed put for 250 ms, so quick taps no longer start a file read + decode per tap (also saves CPU/battery/RAM);
+  2) every audio call in `PreviewTrack` (seek/start/stop/pause/loop/volume) is now guarded: on any failure the preview is dropped and logged
+  to the runtime log instead of crashing the app. Update() uses try/catch (no per-frame allocation).
+- Tests: CI 178/178 and Android build succeeded, but this is audio/UI behaviour that no unit test covers - the phone is the only real check.
+- Phone test: tap quickly between maps (try 10+ taps, also scrolling and tapping), with and without waiting; music should follow the final
+  selection after a short pause and the app must not crash. If it still crashes, send the new crash text (the stack trace shows which call).
