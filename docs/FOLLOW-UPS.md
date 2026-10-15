@@ -135,3 +135,18 @@
 - Tests: CI 178/178 and Android build succeeded, but this is audio/UI behaviour that no unit test covers - the phone is the only real check.
 - Phone test: tap quickly between maps (try 10+ taps, also scrolling and tapping), with and without waiting; music should follow the final
   selection after a short pause and the app must not crash. If it still crashes, send the new crash text (the stack trace shows which call).
+
+## UI-7 replaced: landscape-only + bigger touch targets (user decision 2026-10-15: portrait is dropped for the Android port)
+- Orientation: `MainActivity` now uses `ScreenOrientation.SensorLandscape` (landscape either way up, never portrait). Portrait layout work is cancelled;
+  no portrait code paths remain to maintain. (Before: FullUser = any orientation.)
+- Finding: only the song-select screen and a few overlays have phone sizing (`MobileMetrics`); the editor (EditorScreen, ~6000+ lines) and most
+  panels use fixed desktop sizes designed for a 1366x768 layout. On the Infinix (720 px short side, ~70 mm) 768 layout units = 70 mm, so a 40-unit button
+  is only ~3.6 mm (comfortable touch targets are ~7-9 mm).
+- Step 1 (715350d, CI verified 178/178 + Android build, NOT phone-tested): one global lever - `MobileMetrics.TargetDrawSize` = 1024x576 on phones
+  (desktop stays 1366x768). Everything scales ~1.33x larger (scale 0.94 -> 1.25 on a 1612x720 screen), including the editor. The already phone-tuned
+  `MobileMetrics` values are multiplied by 0.75 so song select's controls keep their tested physical size. Fixed dialogs (<= 560 units tall) still fit 576.
+- Risk to check on the phone: panels designed for 768 units of height now have 576, so editor panels/timeline may overlap or clip. Tuning is one line
+  (`TargetDrawSize`): larger value = smaller controls and more room.
+- Next steps (incremental, need screenshots first): (a) screenshots of song select + editor (landscape) to see overlaps/clipping and which controls
+  are still too small; (b) enlarge specific editor controls (tool buttons, timeline/seek, snap/zoom, playback, popovers) with `MobileMetrics.Pick`;
+  (c) per-screen spacing/arrangement fixes. Keep editing logic untouched.
