@@ -2319,13 +2319,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // the full available area (DrawableOsuEditorRuleset overrides the adjustment container to
             // Size = Vector2.One, dropping gameplay's 0.8 shrink). The smaller of width/height binds, keeping
             // the 4:3 aspect; this is a fixed scale independent of circle size.
-            // A hair under full-fit so there's a slight breathing margin from the top/bottom timelines.
+            // Full fit (PlayfieldFit.EDITOR_FIT): the field's border reaches the top/bottom timeline bars.
             // In presentation mode (video export) we DON'T want the editor's near-full fit: reinstate gameplay's
             // 0.8 shrink so objects and their approach circles near the playfield edges aren't clipped by the frame.
-            float fitFactor = presentationMode ? presentation_scale : 0.97f;
-            float scale = Math.Min(
-                DrawWidth / ParsedBeatmap.PLAYFIELD_WIDTH,
-                DrawHeight / ParsedBeatmap.PLAYFIELD_HEIGHT) * fitFactor;
+            float fitFactor = presentationMode ? presentation_scale : PlayfieldFit.EDITOR_FIT;
+            float scale = PlayfieldFit.Scale(DrawWidth, DrawHeight,
+                ParsedBeatmap.PLAYFIELD_WIDTH, ParsedBeatmap.PLAYFIELD_HEIGHT, fitFactor);
 
             // HardRock flips the play area vertically about its centre (y' = 384 - y), exactly like osu!'s HR.
             // Flipping the whole container keeps input (ToLocalSpace), overlays and selection consistent for
