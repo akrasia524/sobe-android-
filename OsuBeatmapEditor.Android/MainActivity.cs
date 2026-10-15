@@ -15,8 +15,8 @@ namespace OsuBeatmapEditor.Android
         Exported = true,
         LaunchMode = DEFAULT_LAUNCH_MODE,
         MainLauncher = true,
-        // Follow the device sensor so the editor works in both portrait and landscape.
-        ScreenOrientation = ScreenOrientation.FullUser)]
+        // Landscape only (either way up, following the sensor): the editor is designed for a wide screen and portrait is not supported.
+        ScreenOrientation = ScreenOrientation.SensorLandscape)]
     public class MainActivity : AndroidGameActivity
     {
         protected override void OnCreate(Bundle? savedInstanceState)
