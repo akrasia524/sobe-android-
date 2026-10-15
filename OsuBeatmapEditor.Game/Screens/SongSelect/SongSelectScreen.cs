@@ -17,6 +17,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.IO.Stores;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
@@ -114,6 +115,8 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         private ITrackStore? trackStore;
         private PreviewTrack? currentPreview;
         private int previewRequest;
+        private const double preview_settle_ms = 250;
+        private ScheduledDelegate? previewDelay;
 
         private BeatmapSetModel? selectedSet;
         private BeatmapDifficultyModel? selectedDiff;
@@ -847,7 +850,11 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
             if (loadedAudioKey != audioKey)
             {
                 loadedAudioKey = audioKey;
-                loadPreview(set, diff);
+
+                // Tapping through maps quickly must not start a track load (file read + decode) per tap: wait until the
+                // selection has settled for a moment, and only then load the preview of the map that is actually selected.
+                previewDelay?.Cancel();
+                previewDelay = Scheduler.AddDelayed(() => loadPreview(set, diff), preview_settle_ms);
             }
         }
 
@@ -1365,9 +1372,15 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
                 // Don't clamp to track.Length here: the length may not be populated yet, and clamping
                 // to 0 would make the preview play from the start instead of the preview point.
-                track.Seek(Math.Max(0, time));
-                track.Volume.Value = 1;
-                track.Start();
+                // A failing audio backend (seen on Android after rapid map switching) must lose the preview, never crash the app.
+                if (!guard(() =>
+                {
+                    track.Seek(Math.Max(0, time));
+                    track.Volume.Value = 1;
+                    track.Start();
+                }))
+                    return;
+
                 fading = false;
                 fadeProgress = 1;
                 looping = true;
@@ -1379,22 +1392,29 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                 if (track == null)
                     return false;
 
-                if (track.IsRunning)
+                bool nowPlaying = false;
+                if (!guard(() =>
                 {
-                    track.Stop();
-                    looping = false;
+                    if (track.IsRunning)
+                    {
+                        track.Stop();
+                    }
+                    else
+                    {
+                        track.Start();
+                        nowPlaying = true;
+                    }
+                }))
                     return false;
-                }
 
-                track.Start();
-                looping = true;
-                return true;
+                looping = nowPlaying;
+                return nowPlaying;
             }
 
             public void Stop()
             {
                 looping = false;
-                track?.Stop();
+                guard(() => track?.Stop());
             }
 
             protected override void Update()
@@ -1404,20 +1424,28 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                 if (track == null)
                     return;
 
-                // Ease the volume up after a loop restart (a soft fade-in rather than a hard cut).
-                if (fading)
+                // try/catch rather than guard(): this runs every frame and must not allocate.
+                try
                 {
-                    fadeProgress = Math.Min(1, fadeProgress + Time.Elapsed / loop_fade_ms);
-                    track.Volume.Value = fadeProgress;
-                    if (fadeProgress >= 1)
-                        fading = false;
-                }
+                    // Ease the volume up after a loop restart (a soft fade-in rather than a hard cut).
+                    if (fading)
+                    {
+                        fadeProgress = Math.Min(1, fadeProgress + Time.Elapsed / loop_fade_ms);
+                        track.Volume.Value = fadeProgress;
+                        if (fadeProgress >= 1)
+                            fading = false;
+                    }
 
-                // The track has finished on its own: after a short gap, loop back to the start with a fade-in.
-                if (looping && !restarting && track.Length > 0 && !track.IsRunning && track.CurrentTime >= track.Length - 60)
+                    // The track has finished on its own: after a short gap, loop back to the start with a fade-in.
+                    if (looping && !restarting && track.Length > 0 && !track.IsRunning && track.CurrentTime >= track.Length - 60)
+                    {
+                        restarting = true;
+                        Scheduler.AddDelayed(restartFromStart, loop_gap_ms);
+                    }
+                }
+                catch (Exception e)
                 {
-                    restarting = true;
-                    Scheduler.AddDelayed(restartFromStart, loop_gap_ms);
+                    dropTrack(e);
                 }
             }
 
@@ -1428,17 +1456,55 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                 if (track == null || !looping)
                     return;
 
-                track.Seek(0);
-                track.Volume.Value = 0;
                 fadeProgress = 0;
                 fading = true;
-                track.Start();
+                guard(() =>
+                {
+                    track.Seek(0);
+                    track.Volume.Value = 0;
+                    track.Start();
+                });
+            }
+
+            /// <summary>Runs an audio call; any failure drops the track (the preview just stops) instead of crashing the app.</summary>
+            private bool guard(Action action)
+            {
+                try
+                {
+                    action();
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    dropTrack(e);
+                    return false;
+                }
+            }
+
+            private void dropTrack(Exception e)
+            {
+                Logger.Log($"Song preview audio failed and was dropped: {e.GetBaseException().Message}", LoggingTarget.Runtime, LogLevel.Error);
+                looping = false;
+                restarting = false;
+                var broken = track;
+                track = null;
+
+                try { broken?.Dispose(); }
+                catch (Exception) { }
             }
 
             protected override void Dispose(bool isDisposing)
             {
-                track?.Stop();
-                track?.Dispose();
+                try
+                {
+                    track?.Stop();
+                    track?.Dispose();
+                }
+                catch (Exception)
+                {
+                    // already broken or disposed: nothing left to release
+                }
+
                 base.Dispose(isDisposing);
             }
         }
