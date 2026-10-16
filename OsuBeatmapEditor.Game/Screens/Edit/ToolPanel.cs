@@ -39,6 +39,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Left margin of the whole panel inside the editor (moves the column right on phones).</summary>
         public static float LeftMargin => MobileMetrics.IsMobile ? 120 : 12;
 
+        /// <summary>Extra downward shift of the panel from vertical centre (phones only).</summary>
+        public static float TopOffset => MobileMetrics.IsMobile ? 28 : 0;
+
         /// <summary>Raised when a tool row is clicked.</summary>
         public Action<EditorTool>? ToolSelected;
 

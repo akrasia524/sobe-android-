@@ -2658,7 +2658,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             foreach (var o in currentHitObjects)
             {
-                if (o.StartTime <= time)
+                // Strictly before: an object sitting exactly at the (snapped) time is the one the ghost overlaps, so it must
+                // not be counted - otherwise the ghost shows the NEXT number (3) on top of that object's own number (2).
+                if (o.StartTime < time - 0.5)
                 {
                     prevNumber = o.ComboNumber;
                     prevIndex = o.ComboIndex;

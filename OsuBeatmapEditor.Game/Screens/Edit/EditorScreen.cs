@@ -806,7 +806,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    Margin = new MarginPadding { Left = ToolPanel.LeftMargin },
+                    Margin = new MarginPadding { Left = ToolPanel.LeftMargin, Top = ToolPanel.TopOffset },
                     AutoSizeAxes = Axes.Both,
                     Direction = FillDirection.Vertical,
                     Spacing = new Vector2(0, EditorTheme.Spacing.Md),
