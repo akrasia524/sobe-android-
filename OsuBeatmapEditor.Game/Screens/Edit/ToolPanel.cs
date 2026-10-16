@@ -6,6 +6,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using OsuBeatmapEditor.Game.Graphics;
+using OsuBeatmapEditor.Game.UI;
 using osuTK;
 using osuTK.Graphics;
 
@@ -26,6 +27,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
     /// </summary>
     public partial class ToolPanel : CompositeDrawable
     {
+        // Phone sizing (design units at the 1024x576 mobile target): big finger-sized rows. Desktop keeps the original compact rows.
+        private static float rowWidth => MobileMetrics.IsMobile ? 176 : 124;
+        private static float rowHeight => MobileMetrics.IsMobile ? 56 : EditorTheme.Sizing.RowHeight;
+        private static float rowGap => MobileMetrics.IsMobile ? 8 : 6;
+        private static float iconX => MobileMetrics.IsMobile ? 42 : 32;
+        private static float iconSize => MobileMetrics.IsMobile ? 24 : 13;
+        private static float labelX => MobileMetrics.IsMobile ? 78 : 54;
+        private static float hoverNudge => 4;
+
+        /// <summary>Left margin of the whole panel inside the editor (moves the column right on phones).</summary>
+        public static float LeftMargin => MobileMetrics.IsMobile ? 120 : 12;
+
         /// <summary>Raised when a tool row is clicked.</summary>
         public Action<EditorTool>? ToolSelected;
 
@@ -47,7 +60,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 Direction = FillDirection.Vertical,
                 AutoSizeAxes = Axes.Both,
-                Spacing = new Vector2(0, 6),
+                Spacing = new Vector2(0, rowGap),
             };
 
             foreach (var (tool, key, label, icon) in entries)
@@ -86,7 +99,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 this.disabled = disabled;
                 Action = onClick;
 
-                Size = new Vector2(124, EditorTheme.Sizing.RowHeight);
+                Size = new Vector2(rowWidth, rowHeight);
                 Masking = true;
                 CornerRadius = EditorTheme.Radius.Md;
                 Alpha = disabled ? 0.55f : 1f;
@@ -107,8 +120,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     {
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
-                        X = 32,
-                        Size = new Vector2(13),
+                        X = iconX,
+                        Size = new Vector2(iconSize),
                         Icon = icon,
                         Colour = disabled ? EditorTheme.Colours.TextFaint : EditorTheme.Colours.TextMuted,
                     },
@@ -116,10 +129,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     {
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
-                        X = 54,
+                        X = labelX,
                         Text = text,
                         Colour = disabled ? EditorTheme.Colours.TextFaint : EditorTheme.Colours.Text,
-                        Font = EditorTheme.Type.BodyStrong(),
+                        Font = MobileMetrics.IsMobile ? EditorTheme.Type.Heading() : EditorTheme.Type.BodyStrong(),
                     },
                 };
             }
@@ -147,8 +160,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 // so we nudge the contents rather than scaling the whole row.
                 if (!disabled)
                 {
-                    iconSprite.MoveToX(36, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
-                    label.MoveToX(58, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+                    iconSprite.MoveToX(iconX + hoverNudge, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+                    label.MoveToX(labelX + hoverNudge, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
                 }
 
                 return base.OnHover(e);
@@ -163,8 +176,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     iconSprite.FadeColour(disabled ? EditorTheme.Colours.TextFaint : EditorTheme.Colours.TextMuted, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
                 }
 
-                iconSprite.MoveToX(32, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
-                label.MoveToX(54, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+                iconSprite.MoveToX(iconX, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+                label.MoveToX(labelX, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
                 base.OnHoverLost(e);
             }
 
