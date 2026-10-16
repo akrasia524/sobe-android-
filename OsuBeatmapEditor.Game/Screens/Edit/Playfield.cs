@@ -2650,7 +2650,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>The combo colour and number a circle placed at the current time would receive.</summary>
         private (Color4 colour, int number) previewCombo()
         {
+            // Count only objects the playhead has actually reached on screen. The snapped placement time can round FORWARD
+            // past the next object, and the playfield draws by the (audio-offset) visual clock, so using the snapped time
+            // alone made the ghost read one number too high (e.g. 3) on top of the real object that is still 2.
             double time = SnappedTimeSource?.Invoke() ?? TimeSource?.Invoke() ?? 0;
+            if (TimeSource != null)
+                time = Math.Min(time, TimeSource());
 
             int prevNumber = 0;
             int prevIndex = 0;
