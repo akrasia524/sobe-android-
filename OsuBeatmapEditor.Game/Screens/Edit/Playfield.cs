@@ -2407,32 +2407,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             };
         }
 
-        /// <summary>True while any mouse button or finger is held down.</summary>
-        private bool pointerIsDown()
-        {
-            var input = GetContainingInputManager();
-            if (input == null)
-                return false;
-
-            return input.CurrentState.Mouse.Buttons.HasAnyButtonPressed || input.CurrentState.Touch.ActiveSources.HasAnyButtonPressed;
-        }
-
         /// <summary>Tracks the ghost circle (and slider trace) to the cursor while a placement tool is armed.</summary>
         private void updatePlacementPreview()
         {
-            // Touch screens have no hover: the "cursor" stays at the last finger position, so the ghost used to sit there
-            // permanently - on top of real objects, showing the NEXT combo number/colour and looking like a skipped number.
-            // On phones the ghost is therefore only drawn while a finger is down (or while a slider is being traced).
-            if (UI.MobileMetrics.IsMobile && !buildingSlider && !pointerIsDown())
-            {
-                placementPreview.Alpha = 0;
-                sliderPreview?.Hide();
-                if (sliderTailPreview != null) sliderTailPreview.Alpha = 0;
-                clearPreviewFollowPoints();
-                spacingGuideLayer.Clear();
-                return;
-            }
-
             if ((!PlacementActive && !SliderPlacementActive) || !TryGetCursorOsuPosition(out var pos))
             {
                 placementPreview.Alpha = 0;
