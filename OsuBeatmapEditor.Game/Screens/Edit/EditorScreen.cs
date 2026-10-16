@@ -1995,7 +1995,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// </summary>
         private void updatePlacementComboPreview()
         {
-            bool armed = playfield.PlacementActive || playfield.SliderPlacementActive;
+            // The live renumbering (mirroring lazer) shifted every later object's number/colour by one while Circle/Slider was
+            // selected, which on the phone read as a bug ("3" where the timeline says 2). Desktop keeps the lazer behaviour;
+            // on phones the real numbers always show.
+            bool armed = !UI.MobileMetrics.IsMobile && (playfield.PlacementActive || playfield.SliderPlacementActive);
 
             if (!armed)
             {
