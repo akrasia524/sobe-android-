@@ -6471,6 +6471,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     playfield.CancelSliderBuild();
                 else if (spinnerBuilding)
                     playfield.CancelSpinnerBuild();
+                // Phones: the Android Back button maps to this key, and needing 2-3 presses (disarm tool, clear selection,
+                // then exit) was confusing - so there Back exits (via the unsaved-changes prompt) straight away.
+                else if (UI.MobileMetrics.IsMobile)
+                    tryExit();
                 else if (playfield.PlacementActive || playfield.SliderPlacementActive || playfield.SpinnerPlacementActive)
                 {
                     playfield.SetPlacementActive(false);
