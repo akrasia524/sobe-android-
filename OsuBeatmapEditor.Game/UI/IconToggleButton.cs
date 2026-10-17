@@ -29,6 +29,9 @@ namespace OsuBeatmapEditor.Game.UI
 
         public LocalisableString TooltipText { get; }
 
+        /// <summary>Glyph size (default 14); raise together with <c>size</c> for touch-sized buttons.</summary>
+        public float IconSize { get; init; } = 14;
+
         public IconToggleButton(BindableBool active, IconUsage icon, string tooltip, float size = 30)
         {
             this.active = active;
@@ -55,7 +58,7 @@ namespace OsuBeatmapEditor.Game.UI
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         Icon = icon,
-                        Size = new Vector2(14),
+                        Size = new Vector2(IconSize),
                         Colour = EditorTheme.Colours.TextMuted,
                     },
                 },

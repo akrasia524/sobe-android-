@@ -79,7 +79,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
                             Colour = OsuColour.Text,
-                            Font = FontUsage.Default.With(size: 9, weight: "Bold"),
+                            Font = FontUsage.Default.With(size: Size.X * 0.3f, weight: "Bold"), // 9 at the default 30
                         },
                     },
                 },

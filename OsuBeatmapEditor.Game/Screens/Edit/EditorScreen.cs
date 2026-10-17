@@ -58,6 +58,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private static float top_left_icon_button => UI.MobileMetrics.IsMobile ? 34 : 24;
         private static float top_left_round_button => UI.MobileMetrics.IsMobile ? 34 : 30;
         private static float top_left_icon_glyph => UI.MobileMetrics.IsMobile ? 18 : 13;
+        // Bottom-left control row (dim ring, patterns, modding/review). Phones: 42-unit buttons, nudged left.
+        private static float bottom_left_button => UI.MobileMetrics.IsMobile ? 42 : 30;
+        private static float bottom_left_icon => UI.MobileMetrics.IsMobile ? 22 : 14;
+        private static float bottom_left_ring_x => UI.MobileMetrics.IsMobile ? 4 : 12;
+        private static float bottom_left_gap => UI.MobileMetrics.IsMobile ? 8 : 6;
         private static float top_left_gap => UI.MobileMetrics.IsMobile ? 5 : 6;
 
         // Height of each hitsound lane row when the editor is expanded; the three lanes (plus the object band)
@@ -611,19 +616,20 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 {
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
-                    Margin = new MarginPadding { Left = 50, Bottom = bottom_bar_height + 12 },
+                    Margin = new MarginPadding { Left = UI.MobileMetrics.IsMobile ? bottom_left_ring_x + bottom_left_button + bottom_left_gap : 50, Bottom = bottom_bar_height + 12 },
                     AutoSizeAxes = Axes.Both,
                     Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(6, 0),
+                    Spacing = new Vector2(bottom_left_gap, 0),
                     Children = new Drawable[]
                     {
                         new IconBarButton(FontAwesome.Solid.Shapes, $"Pattern gallery ({Shortcut.CommandName}+Shift+P)", () => patternGallery.ToggleVisibility())
                         {
-                            Size = new Vector2(30),
+                            Size = new Vector2(bottom_left_button),
+                            IconSize = bottom_left_icon,
                         },
-                        new IconToggleButton(moddingMode, FontAwesome.Solid.Comments, $"Modding mode ({Shortcut.CommandName}+Shift+M) - review the map's osu! discussions"),
+                        new IconToggleButton(moddingMode, FontAwesome.Solid.Comments, $"Modding mode ({Shortcut.CommandName}+Shift+M) - review the map's osu! discussions", bottom_left_button) { IconSize = bottom_left_icon },
                         review_enabled
-                            ? new IconToggleButton(reviewMode, FontAwesome.Regular.StickyNote, $"Review mode ({Shortcut.CommandName}+Shift+A) - notes/suggestions only visible in this editor, shareable as a .sobemod file")
+                            ? new IconToggleButton(reviewMode, FontAwesome.Regular.StickyNote, $"Review mode ({Shortcut.CommandName}+Shift+A) - notes/suggestions only visible in this editor, shareable as a .sobemod file", bottom_left_button) { IconSize = bottom_left_icon }
                             : Empty(),
                     },
                 },
@@ -635,9 +641,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 },
                 backgroundDimButton = new BackgroundToggleButton(settings.BackgroundDim, backgroundTexture != null)
                 {
+                    Size = new Vector2(bottom_left_button),
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
-                    Margin = new MarginPadding { Left = 12, Bottom = bottom_bar_height + 12 },
+                    Margin = new MarginPadding { Left = bottom_left_ring_x, Bottom = bottom_bar_height + 12 },
                 },
                 new FpsCounter
                 {
