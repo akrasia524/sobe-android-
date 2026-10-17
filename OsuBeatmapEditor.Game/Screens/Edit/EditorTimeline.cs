@@ -22,6 +22,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
     {
         public const float HEIGHT = 46;
 
+        // Phones: the time + percentage readout sits 40 units further right; the seek bar starts correspondingly later so nothing overlaps.
+        private static float time_shift => UI.MobileMetrics.IsMobile ? 40 : 0;
+
         private readonly Track? track;
         private readonly ParsedBeatmap? beatmap;
         private readonly Func<double>? timeSource;
@@ -73,7 +76,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    Margin = new MarginPadding { Left = 16 },
+                    Margin = new MarginPadding { Left = 16 + time_shift },
                     Action = () => OnTimeClicked?.Invoke(),
                     TooltipText = "Copy timestamp",
                     Child = new FillFlowContainer
@@ -106,7 +109,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Padding = new MarginPadding { Left = 200, Right = 24 + rightInset, Vertical = 9 },
+                    Padding = new MarginPadding { Left = 200 + time_shift, Right = 24 + rightInset, Vertical = 9 },
                     Child = seekBar = new SeekBar(track, beatmap, () => currentTime),
                 },
             };
