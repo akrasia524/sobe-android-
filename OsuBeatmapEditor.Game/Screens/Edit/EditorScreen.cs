@@ -286,6 +286,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // Phones: the snap divisor lives in its own big box below the top bar (right of the playfield) instead of in the top-right panel.
         private Container divisorHost = null!;
         private const float divisor_right_inset = 145f;
+        private const float mod_column_width = 62f;
+        private const float mod_column_button_height = 44f;
+
+        /// <summary>Phones: puts the modifier chips in one big vertical column, top to bottom HD, HR, DT, EZ, AU (then the Auto "..." menu).</summary>
+        private void layoutModColumn()
+        {
+            // Construction order is EZ, HD, HR, rate (DT), AU, dots; the flow lays out by layout position.
+            var kids = modButtons.Children.ToList();
+            int[] order = { 3, 0, 1, 2, 4, 5 }; // position of each kid: EZ=3, HD=0, HR=1, DT=2, AU=4, dots=5
+            for (int i = 0; i < kids.Count && i < order.Length; i++)
+            {
+                modButtons.SetLayoutPosition(kids[i], order[i]);
+                kids[i].Size = new Vector2(mod_column_width, i == 5 ? 34 : mod_column_button_height);
+            }
+        }
         private Container timelineSidePanel = null!;
         private Container timelineLeftPanel = null!;
         private FillFlowContainer modButtons = null!;
@@ -754,11 +769,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
                     Margin = new MarginPadding { Right = 16, Top = top_bar_height + 96 },
-                    // Exactly three chips wide (3·38 + 2·6) so the grid wraps to 2 rows and stays flush-right.
-                    Width = 3 * 38 + 2 * 6,
+                    // Desktop: exactly three chips wide (3·38 + 2·6) so the grid wraps to 2 rows and stays flush-right.
+                    // Phones: a single vertical column of big 62x44 buttons (HD, HR, DT, EZ, AU - see the layout order below).
+                    Width = UI.MobileMetrics.IsMobile ? mod_column_width : 3 * 38 + 2 * 6,
                     AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Full,
-                    Spacing = new Vector2(6, 6),
+                    Direction = UI.MobileMetrics.IsMobile ? FillDirection.Vertical : FillDirection.Full,
+                    Spacing = new Vector2(6, UI.MobileMetrics.IsMobile ? 8 : 6),
                     Children = new Drawable[]
                     {
                         easyButton = new ModToggleButton(easyMod, "EZ", EditorTheme.Colours.Velocity, "Easy - bigger circles, slower approach (CS/AR halved). Can't mix with HardRock"),
@@ -921,6 +937,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             playfield.SnappedTimeSource = () => snapTime(CurrentTime);
             playfield.PlacementSnap = SnapPlacement;
             playfield.GridSnap = GridSnapPosition;
+
+            if (UI.MobileMetrics.IsMobile)
+                layoutModColumn();
 
             setupVideoExportPanel();
             playfield.SpacingGuideResolver = ResolveSpacingGuide;
@@ -2001,7 +2020,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // the modding panel since they live in the compose area.
             divisorHost.Margin = new MarginPadding { Right = divisor_right_inset + moddingInsetCurrent, Top = topHeightCurrent + 6 };
             float chipsTop = topHeightCurrent + 8;
-            modButtons.Margin = new MarginPadding { Right = moddingInsetCurrent, Top = chipsTop };
+            modButtons.Margin = new MarginPadding { Right = moddingInsetCurrent + (UI.MobileMetrics.IsMobile ? 10 : 0), Top = chipsTop };
             float belowChips = chipsTop + modButtons.DrawHeight + 6;
             autoMenu.Margin = new MarginPadding { Right = hudRight, Top = belowChips };
             distanceSnapText.Margin = new MarginPadding { Right = hudRight, Top = belowChips };
