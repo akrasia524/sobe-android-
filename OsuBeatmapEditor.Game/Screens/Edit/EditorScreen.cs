@@ -52,7 +52,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private const bool review_enabled = false;
 
         // Width reserved on the right of the top timeline for the adjacent settings panel (beat divisor / BPM / SV).
-        private const float timeline_side_width = 168f;
+        // Phones get a slightly wider side panel for the bigger BPM / SV / star readout (both sides, so the timeline stays centred).
+        private static float timeline_side_width => UI.MobileMetrics.IsMobile ? 190f : 168f;
 
         // Top-left control block (two rows inside the 76-unit top bar). Phones: 34-unit finger-sized buttons (2 rows + gap = 72); desktop keeps 24/30.
         private static float top_left_icon_button => UI.MobileMetrics.IsMobile ? 34 : 24;
@@ -693,7 +694,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                     Anchor = Anchor.TopCentre,
                                     Origin = Anchor.TopCentre,
                                     Colour = EditorTheme.Colours.Text,
-                                    Font = UI.MobileMetrics.IsMobile ? EditorTheme.Type.Title(numeric: true) : EditorTheme.Type.Label(numeric: true),
+                                    Font = UI.MobileMetrics.IsMobile ? EditorTheme.Type.Title(numeric: true).With(size: 24) : EditorTheme.Type.Label(numeric: true),
                                 },
                                 // SV readout + live star-rating pill share one row: stacking all four readouts
                                 // overflowed the fixed-height panel and clipped the star at the bottom. The star
@@ -704,7 +705,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                     Origin = Anchor.TopCentre,
                                     AutoSizeAxes = Axes.Both,
                                     Direction = FillDirection.Horizontal,
-                                    Spacing = new Vector2(8, 0),
+                                    Spacing = new Vector2(UI.MobileMetrics.IsMobile ? 16 : 8, 0),
                                     Margin = new MarginPadding { Top = 2 },
                                     Children = new Drawable[]
                                     {
@@ -713,13 +714,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
                                             Colour = EditorTheme.Colours.Velocity,
-                                            Font = UI.MobileMetrics.IsMobile ? EditorTheme.Type.Heading(numeric: true) : EditorTheme.Type.Label(numeric: true),
+                                            Font = UI.MobileMetrics.IsMobile ? EditorTheme.Type.Heading(numeric: true).With(size: 20) : EditorTheme.Type.Label(numeric: true),
                                         },
                                         starChip = new Container
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
                                             AutoSizeAxes = Axes.Both,
+                                            Scale = new Vector2(UI.MobileMetrics.IsMobile ? 1.3f : 1f),
                                             Child = new StarRatingDisplay(0),
                                         },
                                     },

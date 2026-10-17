@@ -44,22 +44,22 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Padding = new MarginPadding(Large ? 5 : 4),
                     Children = new Drawable[]
                     {
-                        new OsuButton("-", OsuColour.Surface) { Size = new Vector2(Large ? 42 : 24), FontSize = Large ? 28 : 18, CornerRadius = 4, Action = () => beatSnap.Step(-1) },
+                        new OsuButton("-", OsuColour.Surface) { Size = new Vector2(Large ? 50 : 24), FontSize = Large ? 32 : 18, CornerRadius = 4, Action = () => beatSnap.Step(-1) },
                         new Container
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
-                            Width = Large ? 58 : 46,
-                            Height = Large ? 42 : 24,
+                            Width = Large ? 68 : 46,
+                            Height = Large ? 50 : 24,
                             Child = label = new SpriteText
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
                                 Colour = OsuColour.Text,
-                                Font = FontUsage.Default.With(size: Large ? 28 : 19, weight: "Bold"),
+                                Font = FontUsage.Default.With(size: Large ? 34 : 19, weight: "Bold"),
                             },
                         },
-                        new OsuButton("+", OsuColour.Surface) { Size = new Vector2(Large ? 42 : 24), FontSize = Large ? 28 : 18, CornerRadius = 4, Action = () => beatSnap.Step(1) },
+                        new OsuButton("+", OsuColour.Surface) { Size = new Vector2(Large ? 50 : 24), FontSize = Large ? 32 : 18, CornerRadius = 4, Action = () => beatSnap.Step(1) },
                     },
                 },
             };
