@@ -23,6 +23,9 @@ namespace OsuBeatmapEditor.Game.UI
         private SpriteIcon iconSprite = null!;
         private Container content = null!;
 
+        /// <summary>Glyph size override (default 13); set together with a larger <see cref="Drawable.Size"/> for touch-sized buttons.</summary>
+        public float IconSize { get; init; } = 13;
+
         public IconBarButton(IconUsage icon, string tooltip, Action onClick)
         {
             this.icon = icon;
@@ -53,7 +56,7 @@ namespace OsuBeatmapEditor.Game.UI
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         Icon = icon,
-                        Size = new Vector2(13),
+                        Size = new Vector2(IconSize),
                         Colour = EditorTheme.Colours.TextMuted,
                     },
                 },

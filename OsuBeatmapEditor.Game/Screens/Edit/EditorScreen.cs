@@ -54,6 +54,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // Width reserved on the right of the top timeline for the adjacent settings panel (beat divisor / BPM / SV).
         private const float timeline_side_width = 168f;
 
+        // Top-left control block (two rows inside the 76-unit top bar). Phones: 34-unit finger-sized buttons (2 rows + gap = 72); desktop keeps 24/30.
+        private static float top_left_icon_button => UI.MobileMetrics.IsMobile ? 34 : 24;
+        private static float top_left_round_button => UI.MobileMetrics.IsMobile ? 34 : 30;
+        private static float top_left_icon_glyph => UI.MobileMetrics.IsMobile ? 18 : 13;
+        private static float top_left_gap => UI.MobileMetrics.IsMobile ? 5 : 6;
+
         // Height of each hitsound lane row when the editor is expanded; the three lanes (plus the object band)
         // give the timeline its extra height. Kept compact so the playfield stays large.
         private const float hitsound_lane_height = 44f;
@@ -546,7 +552,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             Origin = Anchor.Centre,
                             AutoSizeAxes = Axes.Both,
                             Direction = FillDirection.Vertical,
-                            Spacing = new Vector2(0, 6),
+                            Spacing = new Vector2(0, top_left_gap),
                             Children = new Drawable[]
                             {
                                 toolButtons = buildToolButtons(),
@@ -556,14 +562,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                     Origin = Anchor.TopCentre,
                                     AutoSizeAxes = Axes.Both,
                                     Direction = FillDirection.Horizontal,
-                                    Spacing = new Vector2(6, 0),
+                                    Spacing = new Vector2(top_left_gap, 0),
                                     Children = new Drawable[]
                                     {
-                                        new HitsoundModeButton(hitsoundMode),
-                                        new CollabButton(collabLinked, () => collabOverlay.ToggleVisibility(), "Collab - co-map this difficulty with someone (\"git for maps\")"),
+                                        new HitsoundModeButton(hitsoundMode) { Size = new Vector2(top_left_round_button) },
+                                        new CollabButton(collabLinked, () => collabOverlay.ToggleVisibility(), "Collab - co-map this difficulty with someone (\"git for maps\")") { Size = new Vector2(top_left_round_button) },
                                         new UI.IconBarButton(osu.Framework.Graphics.Sprites.FontAwesome.Solid.EyeSlash, "Hide interface (Shift+Tab) - show only the grid/background + objects",
-                                            toggleHud),
-                                        authorsButton = new AuthorsButton(authorshipOn, toggleAuthorship, "Authors - colour objects by who placed them") { Alpha = 0 },
+                                            toggleHud) { Size = new Vector2(top_left_icon_button), IconSize = top_left_icon_glyph },
+                                        authorsButton = new AuthorsButton(authorshipOn, toggleAuthorship, "Authors - colour objects by who placed them") { Size = new Vector2(top_left_round_button), Alpha = 0 },
                                     },
                                 },
                             },
@@ -6167,17 +6173,17 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             Origin = Anchor.TopCentre,
             AutoSizeAxes = Axes.Both,
             Direction = FillDirection.Horizontal,
-            Spacing = new Vector2(6, 0),
+            Spacing = new Vector2(top_left_gap, 0),
             // Ordered "configure the map -> configure the editor -> output", and all uniform icon buttons so the
             // row reads as a consistent toolbar (matching the icon-button row just below it).
             Children = new Drawable[]
             {
                 new UI.IconBarButton(osu.Framework.Graphics.Sprites.FontAwesome.Solid.Music, "Song setup - this map's metadata, difficulty (CS/AR/OD) and colours",
-                    () => songSettingsOverlay.ToggleVisibility()),
+                    () => songSettingsOverlay.ToggleVisibility()) { Size = new Vector2(top_left_icon_button), IconSize = top_left_icon_glyph },
                 new UI.IconBarButton(osu.Framework.Graphics.Sprites.FontAwesome.Solid.Cog, "Settings - editor preferences",
-                    () => settingsOverlay.ToggleVisibility()),
+                    () => settingsOverlay.ToggleVisibility()) { Size = new Vector2(top_left_icon_button), IconSize = top_left_icon_glyph },
                 exportButton = new UI.IconBarButton(osu.Framework.Graphics.Sprites.FontAwesome.Solid.FileExport, "Export... (.osz set or this difficulty's .osu)",
-                    () => exportMenu.ShowAt(exportButton.ScreenSpaceDrawQuad.BottomLeft)),
+                    () => exportMenu.ShowAt(exportButton.ScreenSpaceDrawQuad.BottomLeft)) { Size = new Vector2(top_left_icon_button), IconSize = top_left_icon_glyph },
             },
         };
 

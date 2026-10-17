@@ -49,7 +49,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     // ASCII glyph for "authors".
                     Text = "A",
                     Colour = OsuColour.Text,
-                    Font = FontUsage.Default.With(size: 15, weight: "Bold"),
+                    Font = FontUsage.Default.With(size: Size.X / 2, weight: "Bold"), // 15 at the default 30
                 },
             };
 
