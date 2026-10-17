@@ -282,6 +282,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private int starComputeGeneration;
         private ScheduledDelegate? starRecomputeDebounce;
         private BeatDivisorControl beatDivisorControl = null!;
+        // Phones: the snap divisor lives in its own big box below the top bar (right of the playfield) instead of in the top-right panel.
+        private Container divisorHost = null!;
+        private const float divisor_right_inset = 145f;
         private Container timelineSidePanel = null!;
         private Container timelineLeftPanel = null!;
         private FillFlowContainer modButtons = null!;
@@ -680,7 +683,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             Spacing = new Vector2(0, 3),
                             Children = new Drawable[]
                             {
-                                beatDivisorControl = new BeatDivisorControl
+                                UI.MobileMetrics.IsMobile ? Empty() : beatDivisorControl = new BeatDivisorControl
                                 {
                                     Anchor = Anchor.TopCentre,
                                     Origin = Anchor.TopCentre,
@@ -690,7 +693,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                     Anchor = Anchor.TopCentre,
                                     Origin = Anchor.TopCentre,
                                     Colour = EditorTheme.Colours.Text,
-                                    Font = EditorTheme.Type.Label(numeric: true),
+                                    Font = UI.MobileMetrics.IsMobile ? EditorTheme.Type.Title(numeric: true) : EditorTheme.Type.Label(numeric: true),
                                 },
                                 // SV readout + live star-rating pill share one row: stacking all four readouts
                                 // overflowed the fixed-height panel and clipped the star at the bottom. The star
@@ -710,7 +713,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
                                             Colour = EditorTheme.Colours.Velocity,
-                                            Font = EditorTheme.Type.Label(numeric: true),
+                                            Font = UI.MobileMetrics.IsMobile ? EditorTheme.Type.Heading(numeric: true) : EditorTheme.Type.Label(numeric: true),
                                         },
                                         starChip = new Container
                                         {
@@ -724,6 +727,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             },
                         },
                     },
+                },
+                divisorHost = new Container
+                {
+                    Anchor = Anchor.TopRight,
+                    Origin = Anchor.TopRight,
+                    AutoSizeAxes = Axes.Both,
+                    Margin = new MarginPadding { Right = divisor_right_inset, Top = top_bar_height + 6 },
+                    Child = UI.MobileMetrics.IsMobile ? beatDivisorControl = new BeatDivisorControl { Large = true } : Empty(),
                 },
                 distanceSnapText = new SpriteText
                 {
@@ -1986,6 +1997,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // The mod chips sit just below the timeline, aligned under the settings panel's column (flush right);
             // the Auto popover / distance-snap readout sit below the (wrapping) chip grid. These DO slide left of
             // the modding panel since they live in the compose area.
+            divisorHost.Margin = new MarginPadding { Right = divisor_right_inset + moddingInsetCurrent, Top = topHeightCurrent + 6 };
             float chipsTop = topHeightCurrent + 8;
             modButtons.Margin = new MarginPadding { Right = moddingInsetCurrent, Top = chipsTop };
             float belowChips = chipsTop + modButtons.DrawHeight + 6;

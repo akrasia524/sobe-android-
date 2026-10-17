@@ -20,6 +20,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private SpriteText label = null!;
 
+        /// <summary>Touch-sized variant (phones): 42-unit +/- buttons and a bigger readout.</summary>
+        public bool Large { get; init; }
+
         public BeatDivisorControl()
         {
             AutoSizeAxes = Axes.Both;
@@ -38,25 +41,25 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     AutoSizeAxes = Axes.Both,
                     Direction = FillDirection.Horizontal,
                     Spacing = new Vector2(4, 0),
-                    Padding = new MarginPadding(4),
+                    Padding = new MarginPadding(Large ? 5 : 4),
                     Children = new Drawable[]
                     {
-                        new OsuButton("-", OsuColour.Surface) { Size = new Vector2(24), FontSize = 18, CornerRadius = 4, Action = () => beatSnap.Step(-1) },
+                        new OsuButton("-", OsuColour.Surface) { Size = new Vector2(Large ? 42 : 24), FontSize = Large ? 28 : 18, CornerRadius = 4, Action = () => beatSnap.Step(-1) },
                         new Container
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
-                            Width = 46,
-                            Height = 24,
+                            Width = Large ? 58 : 46,
+                            Height = Large ? 42 : 24,
                             Child = label = new SpriteText
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
                                 Colour = OsuColour.Text,
-                                Font = FontUsage.Default.With(size: 19, weight: "Bold"),
+                                Font = FontUsage.Default.With(size: Large ? 28 : 19, weight: "Bold"),
                             },
                         },
-                        new OsuButton("+", OsuColour.Surface) { Size = new Vector2(24), FontSize = 18, CornerRadius = 4, Action = () => beatSnap.Step(1) },
+                        new OsuButton("+", OsuColour.Surface) { Size = new Vector2(Large ? 42 : 24), FontSize = Large ? 28 : 18, CornerRadius = 4, Action = () => beatSnap.Step(1) },
                     },
                 },
             };
