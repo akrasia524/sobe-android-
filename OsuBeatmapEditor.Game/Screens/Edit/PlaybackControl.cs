@@ -30,8 +30,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private const float mobile_rate_width = 50f;
         private const float mobile_rate_height = 38f;
         private const float mobile_rate_gap = 4f;
-        private const float mobile_play_width = 114f;
-        private const float mobile_play_height = 80f;
+        private const float mobile_play_width = 94f;
+        private const float mobile_play_height = 78f;
+        private const float mobile_glyph_height = 34f; // play triangle and pause bars share this height
         private const float mobile_play_gap = 6f; // between the play button and the bar
 
         // Speed options, slowest → fastest (osu!lazer's set plus 25%).
@@ -94,12 +95,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             if (mobile)
             {
-                // The play button's centre sits over the 25% button (first in the row): the row is centred in the strip.
+                // The play button sits above the speed row; the row is centred in the strip.
                 float rowWidth = tempo_values.Length * mobile_rate_width + (tempo_values.Length - 1) * mobile_rate_gap;
                 float firstCentreFromCentre = -rowWidth / 2f + mobile_rate_width / 2f;
+                // ...and exactly midway between the 25% and 50% buttons (centres are one rate-width + gap apart).
+                float midBetweenFirstTwo = firstCentreFromCentre + (mobile_rate_width + mobile_rate_gap) / 2f;
                 playButton.Anchor = Anchor.BottomCentre;
                 playButton.Origin = Anchor.BottomCentre;
-                playButton.X = firstCentreFromCentre;
+                playButton.X = midBetweenFirstTwo;
                 playButton.Y = -(EditorTimeline.HEIGHT + mobile_play_gap);
 
                 InternalChildren = new Drawable[]
@@ -146,6 +149,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             private Box background = null!;
             private SpriteText glyph = null!;
+            private Drawable playShape = null!;   // phones: drawn shapes (the UI fonts don't reliably have the triangle / bar glyphs)
+            private Drawable pauseShape = null!;
             private bool playing;
 
             public PlayButton(Action onClick)
@@ -165,6 +170,49 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             [BackgroundDependencyLoader]
             private void load()
             {
+                if (mobile)
+                {
+                    var accent = EditorTheme.Colours.Accent;
+                    const float h = mobile_glyph_height;
+                    Children = new Drawable[]
+                    {
+                        background = new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Control },
+                        // Play: a right-pointing triangle (an upward Triangle rotated 90deg), nudged right so it looks optically centred.
+                        playShape = new Container
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Size = new Vector2(h * 0.88f, h),
+                            X = h * 0.06f,
+                            Child = new Triangle
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Size = new Vector2(h, h * 0.88f), // pre-rotation: base h, height 0.88h
+                                Rotation = 90,
+                                Colour = accent,
+                            },
+                        },
+                        // Pause: two equal bars, same overall height as the triangle, centred.
+                        pauseShape = new FillFlowContainer
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            AutoSizeAxes = Axes.Both,
+                            Direction = FillDirection.Horizontal,
+                            Spacing = new Vector2(h * 0.28f, 0),
+                            Alpha = 0,
+                            Children = new Drawable[]
+                            {
+                                new Box { Size = new Vector2(h * 0.3f, h), Colour = accent },
+                                new Box { Size = new Vector2(h * 0.3f, h), Colour = accent },
+                            },
+                        },
+                    };
+                    glyph = new SpriteText(); // unused on phones (kept so SetPlaying has one code path)
+                    return;
+                }
+
                 Children = new Drawable[]
                 {
                     background = new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Control },
@@ -173,8 +221,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         Text = ">",
-                        Colour = mobile ? EditorTheme.Colours.Accent : EditorTheme.Colours.Text,
-                        Font = mobile ? EditorTheme.Type.Title().With(size: 44) : EditorTheme.Type.BodyStrong(),
+                        Colour = EditorTheme.Colours.Text,
+                        Font = EditorTheme.Type.BodyStrong(),
                     },
                 };
             }
@@ -185,7 +233,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     return;
 
                 playing = value;
-                glyph.Text = playing ? "||" : ">";
+                if (mobile)
+                {
+                    playShape.Alpha = playing ? 0 : 1;
+                    pauseShape.Alpha = playing ? 1 : 0;
+                }
+                else
+                    glyph.Text = playing ? "||" : ">";
             }
 
             protected override bool OnHover(HoverEvent e)
