@@ -26,13 +26,36 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private readonly Action onSave;
         private readonly List<(BindableFloat bindable, Func<float> get)> rows = new();
         private SpriteText savedFlash = null!;
+        private BasicScrollContainer scroll = null!;
+
+        private const float full_height = 580;
+        private const float header_height = 40 + 1; // header + divider
+        private const float bottom_screen_gap = 12;
 
         public HumanizeTuningPanel(Action onClose, Action onSave)
         {
             this.onClose = onClose;
             this.onSave = onSave;
             Width = 312;
-            Height = 580;
+            Height = full_height;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            // The panel used to be a fixed 580 tall; on a 576-tall phone screen (positioned below the top bar) its lower part ran
+            // off-screen, so the scroll list's end was unreachable and it just sprang back. Fit it to the room that is actually there.
+            if (Parent != null)
+            {
+                float available = Parent.DrawHeight - Margin.Top - bottom_screen_gap;
+                float h = System.Math.Clamp(available, 200, full_height);
+                if (System.Math.Abs(Height - h) > 0.5f)
+                {
+                    Height = h;
+                    scroll.Height = h - header_height;
+                }
+            }
         }
 
         protected override void PopIn() => this.FadeIn(120, Easing.OutQuad);
@@ -93,6 +116,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             row(list, "Anticip. align full (dot)", -1, 1, () => HumanizeTuning.AnticipationAlignHi, v => HumanizeTuning.AnticipationAlignHi = v);
             row(list, "Follow leash (r)", 0.5f, 2.4f, () => HumanizeTuning.FollowCircleSafety, v => HumanizeTuning.FollowCircleSafety = v);
 
+            // Breathing room after the last slider so it isn't cramped against the panel's bottom edge.
+            list.Add(new Container { RelativeSizeAxes = Axes.X, Height = 56 });
+
             InternalChild = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -115,10 +141,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         {
                             header(),
                             new Box { RelativeSizeAxes = Axes.X, Height = 1, Colour = EditorTheme.Colours.Sunken },
-                            new BasicScrollContainer
+                            scroll = new BasicScrollContainer
                             {
                                 RelativeSizeAxes = Axes.X,
-                                Height = 580 - 40 - 1, // panel height minus the header + divider (absolute px)
+                                Height = full_height - header_height, // panel height minus the header + divider; kept in sync in Update()
                                 ScrollbarVisible = true,
                                 Child = list,
                             },
