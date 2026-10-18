@@ -335,10 +335,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         float x = xs[n], y = ys[n];
 
                         var quad = new Quad(
-                            xf(m, new Vector2(x - half, y - half), m),
-                            xf(m, new Vector2(x + half, y - half), m),
-                            xf(m, new Vector2(x - half, y + half), m),
-                            xf(m, new Vector2(x + half, y + half), m));
+                            xf(m, new Vector2(x - half, y - half)),
+                            xf(m, new Vector2(x + half, y - half)),
+                            xf(m, new Vector2(x - half, y + half)),
+                            xf(m, new Vector2(x + half, y + half)));
 
                         renderer.DrawQuad(texture, quad, ColourInfo.SingleColour(colour.Opacity(alpha)));
                     }
