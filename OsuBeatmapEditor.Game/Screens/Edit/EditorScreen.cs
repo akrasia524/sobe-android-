@@ -175,7 +175,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         // Distance snapping: when on, placement is spaced from the previous object proportionally to the time
         // gap (so streams keep slider velocity). Spacing multiplier is adjusted with Alt+scroll, like lazer.
-        private bool distanceSnapEnabled;
+        private readonly BindableBool distanceSnap = new BindableBool();
+        private bool distanceSnapEnabled
+        {
+            get => distanceSnap.Value;
+            set => distanceSnap.Value = value;
+        }
         private double distanceSpacing = 1.0;
         // Grid snapping (T): when on, placement snaps to the nearest visual-grid intersection.
         private bool gridSnapEnabled;
@@ -631,6 +636,31 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         },
                     },
                 },
+                // Phones only: on-screen buttons for editor actions that are keyboard-only shortcuts on desktop
+                // (Timing points F6, Distance snap Y, Convert slider to stream, Add BPM point, Add SV point).
+                UI.MobileMetrics.IsMobile
+                    ? new FillFlowContainer
+                    {
+                        Anchor = Anchor.BottomLeft,
+                        Origin = Anchor.BottomLeft,
+                        Margin = new MarginPadding { Left = bottom_left_ring_x, Bottom = bottom_bar_height + 12 + bottom_left_button + bottom_left_gap },
+                        AutoSizeAxes = Axes.Both,
+                        Direction = FillDirection.Horizontal,
+                        Spacing = new Vector2(bottom_left_gap, 0),
+                        Children = new Drawable[]
+                        {
+                            new IconBarButton(FontAwesome.Solid.Clock, "Timing points", () => toggleEditorOverlay(timingPointsOverlay))
+                            {
+                                Size = new Vector2(bottom_left_button),
+                                IconSize = bottom_left_icon,
+                            },
+                            new IconToggleButton(distanceSnap, FontAwesome.Solid.Magnet, "Distance snap - space new objects by their time gap", bottom_left_button) { IconSize = bottom_left_icon },
+                            new UI.LabelBarButton("Stream", "Convert the selected slider into a stream", convertSelectedSliderToStream, new Vector2(bottom_left_button + 14, bottom_left_button)),
+                            new UI.LabelBarButton("+BPM", "Add a BPM (red) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: true), new Vector2(bottom_left_button + 6, bottom_left_button)),
+                            new UI.LabelBarButton("+SV", "Add an SV (green) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: false), new Vector2(bottom_left_button, bottom_left_button)),
+                        },
+                    }
+                    : Empty(),
                 // Compact icon row in the bottom-left (right of the background-dim wheel): Patterns gallery + the
                 // Modding / Review mode toggles. Icons (not wide text chips) so they stay clear of the playfield.
                 new FillFlowContainer
