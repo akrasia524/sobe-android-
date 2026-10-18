@@ -163,6 +163,6 @@ All on branch `android-port`; each increment CI-verified (tests + APK) and phone
 - Open items: osu!-style cursor trail (see reminder below); the ghost-number tweaks `0b865e5`/`36ddf6d` were not the real fix (the live-renumber preview was, `a9126ae`) but are harmless; layout values are tuned to the 1024x576 mobile target at the Infinix Hot 50 aspect ratio, other aspect ratios not checked.
 - Also fixed on the way: combo-number "skip" while Circle/Slider armed (live renumber disabled on phones) `a9126ae`; Android Back exits the editor in one press `5ca5de4`; Humanize tuning panel scroll/bounce `1c840ae`.
 
-## REMINDER (user asked to revisit later): osu!-style long cursor trail for the Auto cursor
+## Auto cursor long trail - second attempt (awaiting phone test)
 
-An implementation (time-based fade, evenly spaced interpolated pieces) exists in commit `4f568b8` but it was MUCH laggier on the phone than the old trail even at the lowest settings, so it was reverted (`12c69a5`). Next attempt must be cheap: e.g. one custom drawable / single mesh or a small fixed pool (<= ~60 pieces) instead of up to 420 masked CircularContainers updated every frame, and measure frame time before/after.
+Second attempt (single batched drawable, ring buffer of <=640 points, even spacing, wall-clock fade; no child drawables or masking) is in the commits after `ec32a33`; CI tests+APK green. Awaiting phone result for lag/smoothness. The first attempt (`4f568b8`, reverted `12c69a5`) lagged. Look reference: osu!droid uses a tiny soft-dot sprite repeated along the path (own implementation, nothing copied). Frame time could not be measured in CI.
