@@ -24,14 +24,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private const float cursor_size = 22f; // osu!pixels
         private const int max_trail = 120;
 
-        // osu!-style "long" trail: time-based (each piece lives ~trailLength*22 ms regardless of frame rate), pieces are interpolated
-        // along the path at a fixed spacing so fast movement leaves a continuous smooth line instead of gaps, and each piece fades
-        // out (and shrinks a little) over its life. Pieces are pooled drawables.
-        private const int max_pieces = 420;
-        private const float piece_spacing = 4f;           // osu!pixels between interpolated pieces
-        private const double ms_per_trail_unit = 22;       // trail setting (0-120) -> lifetime
-        private const float teleport_distance = 260f;      // a one-frame jump this big (a seek) doesn't draw a streak
-
         private readonly Container trailContainer;
         private readonly CircularContainer head;
         private readonly Box headFill;
@@ -39,11 +31,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private readonly List<CircularContainer> trailParts = new List<CircularContainer>();
         private readonly List<Box> trailFills = new List<Box>();
 
-        // Live trail pieces, oldest first (position + the clock time they were laid down).
-        private readonly List<(Vector2 pos, double born)> pieces = new List<(Vector2, double)>();
-        private static readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
-        private Vector2? lastPos;
-        private double lastTime;
+        // Most-recent-first ring of recent positions; the trail draws the first `trailLength` of these.
+        private readonly LinkedList<Vector2> history = new LinkedList<Vector2>();
 
         private Color4 cursorColour = new Color4(1f, 0.86f, 0.2f, 1f); // yellow default
         private int trailLength = 10;
@@ -69,13 +58,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 },
             };
 
-            for (int i = 0; i < max_pieces; i++)
+            for (int i = 0; i < max_trail; i++)
             {
                 var fill = new Box { RelativeSizeAxes = Axes.Both };
                 var part = new CircularContainer
                 {
                     Origin = Anchor.Centre,
-                    Size = new Vector2(cursor_size * 0.8f),
+                    Size = new Vector2(cursor_size * 0.72f),
                     Masking = true,
                     Alpha = 0,
                     Child = fill,
@@ -113,14 +102,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             base.Update();
 
             Vector2? pos = PositionSource?.Invoke();
-            // Wall-clock time (not the editor/audio clock, which pauses and jumps on seeks): the trail fades in real time like osu!'s.
-            double now = clock.Elapsed.TotalMilliseconds;
 
             if (pos == null)
             {
                 head.Alpha = 0;
-                pieces.Clear();
-                lastPos = null;
+                history.Clear();
                 foreach (var part in trailParts)
                     part.Alpha = 0;
                 return;
@@ -129,78 +115,24 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             head.Alpha = 1;
             head.Position = pos.Value;
 
-            double lifetime = trailLength * ms_per_trail_unit;
+            history.AddFirst(pos.Value);
+            while (history.Count > Math.Max(1, trailLength))
+                history.RemoveLast();
 
-            // Drop expired pieces (oldest first).
-            int expired = 0;
-            while (expired < pieces.Count && now - pieces[expired].born > lifetime)
-                expired++;
-            if (expired > 0)
-                pieces.RemoveRange(0, expired);
+            int shown = Math.Min(trailLength, trailParts.Count);
 
-            if (lifetime <= 0)
-            {
-                pieces.Clear();
-                lastPos = pos.Value;
-                lastTime = now;
-            }
-            else if (lastPos is Vector2 from)
-            {
-                // lastPos/lastTime = the last point a piece was laid at; lay evenly-spaced pieces from there to the cursor.
-                Vector2 delta = pos.Value - from;
-                float dist = delta.Length;
-
-                if (dist > teleport_distance)
-                {
-                    // A seek / jump: don't draw a streak across the playfield, start a fresh trail.
-                    pieces.Clear();
-                    lastPos = pos.Value;
-                    lastTime = now;
-                }
-                else if (dist >= piece_spacing)
-                {
-                    int steps = (int)(dist / piece_spacing);
-                    double span = now - lastTime;
-                    for (int k = 1; k <= steps; k++)
-                    {
-                        float f = k * piece_spacing / dist;
-                        pieces.Add((from + delta * f, lastTime + span * f));
-                    }
-
-                    float used = steps * piece_spacing / dist;
-                    lastPos = from + delta * used;
-                    lastTime += span * used;
-                }
-                else if (dist < 0.05f)
-                {
-                    // Standing still: keep the reference time fresh so the next movement is timestamped from "now".
-                    lastTime = now;
-                }
-                // else: moving slowly - keep accumulating until a full spacing is covered.
-            }
-            else
-            {
-                lastPos = pos.Value;
-                lastTime = now;
-            }
-
-            if (pieces.Count > max_pieces)
-                pieces.RemoveRange(0, pieces.Count - max_pieces);
-
-            // Render oldest -> newest; fade by age.
-            int shown = Math.Min(pieces.Count, trailParts.Count);
             int i = 0;
-            for (; i < shown; i++)
+            var node = history.First;
+            for (; i < shown && node != null; i++, node = node.Next)
             {
-                var (p, born) = pieces[pieces.Count - shown + i];
-                float age = lifetime > 0 ? (float)Math.Clamp((now - born) / lifetime, 0, 1) : 1f; // 0 new .. 1 old
-                float life = 1f - age;
+                float t = (float)i / Math.Max(1, trailLength); // 0 (nearest head) → ~1 (tail)
                 var part = trailParts[i];
-                part.Position = p;
-                part.Alpha = life * life * 0.62f;
-                part.Scale = new Vector2((0.55f + 0.45f * life) * trailWidth);
+                part.Position = node.Value;
+                part.Alpha = (1f - t) * 0.5f;
+                part.Scale = new Vector2((1f - t * 0.45f) * trailWidth);
             }
 
+            // Hide every remaining part (covers a shrunk trail, so nothing lingers at its last position).
             for (; i < trailParts.Count; i++)
                 trailParts[i].Alpha = 0;
         }
