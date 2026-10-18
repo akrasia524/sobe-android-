@@ -158,7 +158,9 @@ All on branch `android-port`; each increment CI-verified (tests + APK) and phone
 - A1 field fit `560a295` (phone-verified) - A2 tool buttons `cb367e0` - A3 top-left controls `108e8e3` - A4 bottom-left controls `3879e5e`
 - A5 time + percentage `52f51bb` - A6 snap divisor box + BPM/SV/star `dc9a4b3`, `0e4ed5d`
 - A7 modifier column HD/HR/DT/EZ/AU `2f60482`, follow-ups (divisor flush under top bar, Auto popup + key overlay positions, bigger "...") `61f391d`
-- A8 play/pause above the speed row (25/50/75/100), phone test PENDING
+- A8 play/pause above the speed row (25/50/75/100) `d7f233e`, play button size/position + drawn play/pause shapes `28c06d9` (phone-verified)
+- Final pass done: tests + APK green on `28c06d9`; every A1-A8 increment phone-verified by the user. Field resize only changes the uniform fit scale (`PlayfieldFit`); circle diameter/CS code untouched.
+- Open items: osu!-style cursor trail (see reminder below); the ghost-number tweaks `0b865e5`/`36ddf6d` were not the real fix (the live-renumber preview was, `a9126ae`) but are harmless; layout values are tuned to the 1024x576 mobile target at the Infinix Hot 50 aspect ratio, other aspect ratios not checked.
 - Also fixed on the way: combo-number "skip" while Circle/Slider armed (live renumber disabled on phones) `a9126ae`; Android Back exits the editor in one press `5ca5de4`; Humanize tuning panel scroll/bounce `1c840ae`.
 
 ## REMINDER (user asked to revisit later): osu!-style long cursor trail for the Auto cursor
