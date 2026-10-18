@@ -340,7 +340,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             xf(m, new Vector2(x - half, y + half)),
                             xf(m, new Vector2(x + half, y + half)));
 
-                        renderer.DrawQuad(texture, quad, ColourInfo.SingleColour(colour.Opacity(alpha)));
+                        renderer.DrawQuad(texture, quad, ColourInfo.SingleColour(new Color4(colour.R, colour.G, colour.B, alpha)));
                     }
 
                     UnbindTextureShader(renderer);
