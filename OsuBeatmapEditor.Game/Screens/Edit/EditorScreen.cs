@@ -285,7 +285,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private BeatDivisorControl beatDivisorControl = null!;
         // Phones: the snap divisor lives in its own big box below the top bar (right of the playfield) instead of in the top-right panel.
         private Container divisorHost = null!;
-        private const float divisor_right_inset = 145f;
+        private const float divisor_right_inset = 78f;   // snap-divisor box: right edge sits just left of the modifier column, top flush with the top bar
+        private const float auto_menu_right_inset = 127f; // Auto-cursor popup (phones): right edge distance from the screen edge
+        private const float auto_menu_top_gap = 65f;      // ...and its top, below the top bar + divisor box
         private const float mod_column_width = 62f;
         private const float mod_column_button_height = 44f;
 
@@ -298,7 +300,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             for (int i = 0; i < kids.Count && i < order.Length; i++)
             {
                 modButtons.SetLayoutPosition(kids[i], order[i]);
-                kids[i].Size = new Vector2(mod_column_width, i == 5 ? 34 : mod_column_button_height);
+                kids[i].Size = new Vector2(mod_column_width, i == 5 ? 42 : mod_column_button_height);
             }
         }
         private Container timelineSidePanel = null!;
@@ -750,7 +752,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
                     AutoSizeAxes = Axes.Both,
-                    Margin = new MarginPadding { Right = divisor_right_inset, Top = top_bar_height + 6 },
+                    Margin = new MarginPadding { Right = divisor_right_inset, Top = top_bar_height },
                     Child = UI.MobileMetrics.IsMobile ? beatDivisorControl = new BeatDivisorControl { Large = true } : Empty(),
                 },
                 distanceSnapText = new SpriteText
@@ -2018,14 +2020,17 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // The mod chips sit just below the timeline, aligned under the settings panel's column (flush right);
             // the Auto popover / distance-snap readout sit below the (wrapping) chip grid. These DO slide left of
             // the modding panel since they live in the compose area.
-            divisorHost.Margin = new MarginPadding { Right = divisor_right_inset + moddingInsetCurrent, Top = topHeightCurrent + 6 };
+            divisorHost.Margin = new MarginPadding { Right = divisor_right_inset + moddingInsetCurrent, Top = topHeightCurrent };
             float chipsTop = topHeightCurrent + 8;
             modButtons.Margin = new MarginPadding { Right = moddingInsetCurrent + (UI.MobileMetrics.IsMobile ? 10 : 0), Top = chipsTop };
             float belowChips = chipsTop + modButtons.DrawHeight + 6;
-            autoMenu.Margin = new MarginPadding { Right = hudRight, Top = belowChips };
+            // Phones: the Auto-cursor popup docks in the open area left of the modifier column, under the divisor box.
+            float autoRight = UI.MobileMetrics.IsMobile ? auto_menu_right_inset + moddingInsetCurrent : hudRight;
+            float autoTop = UI.MobileMetrics.IsMobile ? topHeightCurrent + auto_menu_top_gap : belowChips;
+            autoMenu.Margin = new MarginPadding { Right = autoRight, Top = autoTop };
             distanceSnapText.Margin = new MarginPadding { Right = hudRight, Top = belowChips };
             // Live tuning panel sits just left of the AU mini-menu so both stay visible while dragging sliders.
-            humanizeTuningPanel.Margin = new MarginPadding { Right = hudRight + autoMenu.DrawWidth + 12, Top = belowChips };
+            humanizeTuningPanel.Margin = new MarginPadding { Right = autoRight + autoMenu.DrawWidth + 12, Top = autoTop };
 
             // The left-side hitsound controls block spans the lanes band (below the toolbar) while the lanes are open.
             hitsoundControlsBlock.Height = Math.Max(0, topHeightCurrent - top_bar_height);
@@ -7266,7 +7271,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         Y = -3,
                         Text = "...",
                         Colour = EditorTheme.Colours.TextMuted,
-                        Font = FontUsage.Default.With(size: 16, weight: "Bold"),
+                        Font = FontUsage.Default.With(size: Size.Y * 0.55f, weight: "Bold"), // 16.5 at the default height 30
                     },
                 };
             }

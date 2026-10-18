@@ -241,7 +241,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
-                Margin = new MarginPadding { Right = 12 },
+                // Phones: sits in the open space just left of the modifier column (beside AU), a little below the vertical centre.
+                Margin = UI.MobileMetrics.IsMobile ? new MarginPadding { Right = 77, Top = 68 } : new MarginPadding { Right = 12 },
                 Alpha = 0,
             },
             playArea = new Container
