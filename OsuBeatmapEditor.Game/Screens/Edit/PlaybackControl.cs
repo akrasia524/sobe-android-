@@ -21,7 +21,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
     /// </summary>
     public partial class PlaybackControl : CompositeDrawable
     {
-        public const float WIDTH = 214f;
+        /// <summary>Width of the bottom-bar strip (the seek bar stops this far from the right edge). Phones: 4 big speed buttons only.</summary>
+        public static float WIDTH => UI.MobileMetrics.IsMobile ? 228f : 214f;
+
+        // Phones: the play/pause button is big and sits ABOVE the speed row (outside the bar, over the open space right of the field),
+        // centred over the 25% button; the speed row (25/50/75/100) stays in the bar.
+        private static bool mobile => UI.MobileMetrics.IsMobile;
+        private const float mobile_rate_width = 50f;
+        private const float mobile_rate_height = 38f;
+        private const float mobile_rate_gap = 4f;
+        private const float mobile_play_width = 114f;
+        private const float mobile_play_height = 80f;
+        private const float mobile_play_gap = 6f; // between the play button and the bar
 
         // Speed options, slowest → fastest (osu!lazer's set plus 25%).
         private static readonly double[] tempo_values = { 0.25, 0.5, 0.75, 1 };
@@ -44,7 +55,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             this.togglePlay = togglePlay;
 
             Width = WIDTH;
-            Height = EditorTimeline.HEIGHT;
+            // On phones the control is taller than the bar (its upper part only holds the play button; it has no background/input there).
+            Height = mobile ? EditorTimeline.HEIGHT + mobile_play_gap + mobile_play_height : EditorTimeline.HEIGHT;
             Masking = true;
         }
 
@@ -59,9 +71,17 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 Origin = Anchor.Centre,
                 AutoSizeAxes = Axes.Both,
                 Direction = FillDirection.Horizontal,
-                Spacing = new Vector2(EditorTheme.Spacing.Xs, 0),
-                Children = new Drawable[] { playButton = new PlayButton(togglePlay) },
+                Spacing = new Vector2(mobile ? mobile_rate_gap : EditorTheme.Spacing.Xs, 0),
+                Children = mobile ? System.Array.Empty<Drawable>() : new Drawable[] { playButton = new PlayButton(togglePlay) },
             };
+
+            if (mobile)
+            {
+                playButton = new PlayButton(togglePlay);
+                flow.Anchor = Anchor.BottomCentre;
+                flow.Origin = Anchor.BottomCentre;
+                flow.Y = -(EditorTimeline.HEIGHT - mobile_rate_height) / 2f;
+            }
 
             rateButtons = new RateButton[tempo_values.Length];
             for (int i = 0; i < tempo_values.Length; i++)
@@ -72,11 +92,31 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 flow.Add(button);
             }
 
-            InternalChildren = new Drawable[]
+            if (mobile)
             {
-                new Box { RelativeSizeAxes = Axes.Both, Colour = OsuColour.BackgroundRaised, Alpha = 0.82f },
-                flow,
-            };
+                // The play button's centre sits over the 25% button (first in the row): the row is centred in the strip.
+                float rowWidth = tempo_values.Length * mobile_rate_width + (tempo_values.Length - 1) * mobile_rate_gap;
+                float firstCentreFromCentre = -rowWidth / 2f + mobile_rate_width / 2f;
+                playButton.Anchor = Anchor.BottomCentre;
+                playButton.Origin = Anchor.BottomCentre;
+                playButton.X = firstCentreFromCentre;
+                playButton.Y = -(EditorTimeline.HEIGHT + mobile_play_gap);
+
+                InternalChildren = new Drawable[]
+                {
+                    new Box { RelativeSizeAxes = Axes.X, Height = EditorTimeline.HEIGHT, Anchor = Anchor.BottomLeft, Origin = Anchor.BottomLeft, Colour = OsuColour.BackgroundRaised, Alpha = 0.82f },
+                    flow,
+                    playButton,
+                };
+            }
+            else
+            {
+                InternalChildren = new Drawable[]
+                {
+                    new Box { RelativeSizeAxes = Axes.Both, Colour = OsuColour.BackgroundRaised, Alpha = 0.82f },
+                    flow,
+                };
+            }
 
             setRate(rateIndex);
         }
@@ -111,9 +151,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             public PlayButton(Action onClick)
             {
                 Action = onClick;
-                Size = new Vector2(30, 26);
+                Size = mobile ? new Vector2(mobile_play_width, mobile_play_height) : new Vector2(30, 26);
                 Masking = true;
-                CornerRadius = EditorTheme.Radius.Md;
+                CornerRadius = mobile ? EditorTheme.Radius.Lg : EditorTheme.Radius.Md;
+                if (mobile)
+                {
+                    // Visually distinct from the modifier chips and speed buttons: a big accent-outlined key.
+                    BorderThickness = 3;
+                    BorderColour = EditorTheme.Colours.Accent;
+                }
             }
 
             [BackgroundDependencyLoader]
@@ -127,8 +173,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         Text = ">",
-                        Colour = EditorTheme.Colours.Text,
-                        Font = EditorTheme.Type.BodyStrong(),
+                        Colour = mobile ? EditorTheme.Colours.Accent : EditorTheme.Colours.Text,
+                        Font = mobile ? EditorTheme.Type.Title().With(size: 44) : EditorTheme.Type.BodyStrong(),
                     },
                 };
             }
@@ -165,7 +211,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 Rate = rate;
                 Action = onClick;
-                Size = new Vector2(40, 26);
+                Size = mobile ? new Vector2(mobile_rate_width, mobile_rate_height) : new Vector2(40, 26);
                 Masking = true;
                 CornerRadius = EditorTheme.Radius.Md;
             }
@@ -182,7 +228,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         Origin = Anchor.Centre,
                         Text = $"{Rate:0%}",
                         Colour = EditorTheme.Colours.Text,
-                        Font = EditorTheme.Type.Label(numeric: true),
+                        Font = mobile ? EditorTheme.Type.Heading(numeric: true) : EditorTheme.Type.Label(numeric: true),
                     },
                 };
             }

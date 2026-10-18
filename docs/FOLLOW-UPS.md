@@ -150,3 +150,17 @@
 - Next steps (incremental, need screenshots first): (a) screenshots of song select + editor (landscape) to see overlaps/clipping and which controls
   are still too small; (b) enlarge specific editor controls (tool buttons, timeline/seek, snap/zoom, playback, popovers) with `MobileMetrics.Pick`;
   (c) per-screen spacing/arrangement fixes. Keep editing logic untouched.
+
+## Editor landscape UI (A1-A8) - status
+
+All on branch `android-port`; each increment CI-verified (tests + APK) and phone-verified by the user unless noted.
+
+- A1 field fit `560a295` (phone-verified) - A2 tool buttons `cb367e0` - A3 top-left controls `108e8e3` - A4 bottom-left controls `3879e5e`
+- A5 time + percentage `52f51bb` - A6 snap divisor box + BPM/SV/star `dc9a4b3`, `0e4ed5d`
+- A7 modifier column HD/HR/DT/EZ/AU `2f60482`, follow-ups (divisor flush under top bar, Auto popup + key overlay positions, bigger "...") `61f391d`
+- A8 play/pause above the speed row (25/50/75/100), phone test PENDING
+- Also fixed on the way: combo-number "skip" while Circle/Slider armed (live renumber disabled on phones) `a9126ae`; Android Back exits the editor in one press `5ca5de4`; Humanize tuning panel scroll/bounce `1c840ae`.
+
+## REMINDER (user asked to revisit later): osu!-style long cursor trail for the Auto cursor
+
+An implementation (time-based fade, evenly spaced interpolated pieces) exists in commit `4f568b8` but it was MUCH laggier on the phone than the old trail even at the lowest settings, so it was reverted (`12c69a5`). Next attempt must be cheap: e.g. one custom drawable / single mesh or a small fixed pool (<= ~60 pieces) instead of up to 420 masked CircularContainers updated every frame, and measure frame time before/after.
