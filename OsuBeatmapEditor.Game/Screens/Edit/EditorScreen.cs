@@ -662,6 +662,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 IconSize = 28,
                                 AccentBorder = true,
                             },
+                            new IconBarButton(FontAwesome.Solid.TrashAlt, "Delete the selected object(s)", deleteSelectedFromButton)
+                            {
+                                Anchor = Anchor.BottomRight,
+                                Origin = Anchor.BottomRight,
+                                Margin = new MarginPadding { Right = 235, Bottom = 54 },
+                                Size = new Vector2(73),
+                                IconSize = 30,
+                                AccentBorder = true,
+                                BorderOverride = EditorTheme.Colours.Error,
+                            },
                             new UI.LabelBarButton("Stream", "Convert the selected slider into a stream", convertSliderToStreamFromButton, new Vector2(73))
                             {
                                 AccentBorder = true,
@@ -4168,6 +4178,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// count (what osu!stable's "convert slider to stream" would use). While the panel is open the stream is
         /// previewed live on the playfield via <see cref="refreshStreamPreview"/>; confirm/cancel commit or undo it.
         /// </summary>
+        /// <summary>The on-screen Delete button (the only way to delete on phones).</summary>
+        private void deleteSelectedFromButton()
+        {
+            if (selection.Selected.Count == 0)
+            {
+                toasts?.Push("Select an object first", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            DeleteSelected();
+        }
+
         /// <summary>The on-screen Stream button: like the shortcut, but says why nothing happened.</summary>
         private void convertSliderToStreamFromButton()
         {

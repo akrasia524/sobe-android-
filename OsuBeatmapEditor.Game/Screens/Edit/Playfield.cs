@@ -1235,9 +1235,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             // Right-click quick-delete (M2), like lazer: remove the hovered object or the whole selection.
+            // Phones: a long-press arrives as a right-click, which deleted objects by accident while dragging - there
+            // deleting is done with the on-screen Delete button instead.
             if (e.Button == MouseButton.Right)
             {
-                var o = hittableAt(playArea.ToLocalSpace(e.ScreenSpaceMousePosition));
+                var o = UI.MobileMetrics.IsMobile ? null : hittableAt(playArea.ToLocalSpace(e.ScreenSpaceMousePosition));
                 if (o != null)
                 {
                     if (selection.Contains(o.Id))

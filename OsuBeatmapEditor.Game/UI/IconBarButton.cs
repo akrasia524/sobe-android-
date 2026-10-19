@@ -20,6 +20,9 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Draws a pink (accent) outline like the play/pause button (phone action buttons).</summary>
         public bool AccentBorder { get; init; }
 
+        /// <summary>Overrides the outline colour used when <see cref="AccentBorder"/> is on.</summary>
+        public osuTK.Graphics.Color4? BorderOverride { get; init; }
+
         private readonly IconUsage icon;
         private readonly string tooltip;
         private Box background = null!;
@@ -51,7 +54,7 @@ namespace OsuBeatmapEditor.Game.UI
                 Origin = Anchor.Centre,
                 Masking = true,
                 BorderThickness = AccentBorder ? 3 : 0,
-                BorderColour = EditorTheme.Colours.Accent,
+                BorderColour = BorderOverride ?? EditorTheme.Colours.Accent,
                 CornerRadius = 5,
                 Children = new Drawable[]
                 {

@@ -1921,7 +1921,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // if that object is part of it - matching osu!lazer's right-click delete.
             if (e.Button == MouseButton.Right)
             {
-                int id = objectAt(timeAt(e.ScreenSpaceMousePosition), ToLocalSpace(e.ScreenSpaceMousePosition).Y);
+                int id = UI.MobileMetrics.IsMobile ? -1 : objectAt(timeAt(e.ScreenSpaceMousePosition), ToLocalSpace(e.ScreenSpaceMousePosition).Y); // phones: no long-press delete
                 if (id >= 0)
                 {
                     if (selection.Contains(id))
