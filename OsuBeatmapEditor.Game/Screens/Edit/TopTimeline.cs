@@ -120,6 +120,19 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Invoked when the user selects an object via the timeline, so the editor can switch to the select tool.</summary>
         public Action? ObjectSelectedHere;
 
+        /// <summary>
+        /// Phones: when true, dragging the timeline scrolls it (seeking the track) instead of selecting / moving
+        /// objects, so objects can be placed at a precise time. Taps and drags are claimed by the timeline itself.
+        /// </summary>
+        public bool ScrollMode;
+
+        /// <summary>Asks the editor to seek the track to a time (ms); used by <see cref="ScrollMode"/> drags.</summary>
+        public Action<double>? SeekRequested;
+
+        private bool scrollDragging;
+        private double scrollDragStartTime;
+        private float scrollDragStartX;
+
         // --- Hitsound lanes (the expanded Clap/Whistle/Finish editor) ---
         private const int hs_whistle = 0b0010, hs_finish = 0b0100, hs_clap = 0b1000;
 
@@ -1905,6 +1918,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            if (ScrollMode)
+                return true; // claim the press so the drag scrolls (see OnDragStart)
+
             // The lanes' control gutter is owned by its inline controls (banks/volume/index/copy-paste): don't claim
             // the press, so those child controls receive it (and the volume slider can drag).
             if (inLaneGutter(e.ScreenSpaceMousePosition))
@@ -1939,6 +1955,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         protected override bool OnClick(ClickEvent e)
         {
+            if (ScrollMode)
+                return true; // scroll mode never selects / clears on tap
+
             // Clicks on the control gutter belong to its inline controls; never clear the selection or paint there.
             if (inLaneGutter(e.ScreenSpaceMousePosition))
                 return false;
@@ -2046,6 +2065,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         protected override bool OnDragStart(DragStartEvent e)
         {
+            if (ScrollMode)
+            {
+                scrollDragging = true;
+                scrollDragStartTime = currentTime();
+                scrollDragStartX = ToLocalSpace(e.ScreenSpaceMouseDownPosition).X;
+                return true;
+            }
+
             // A drag starting on the control gutter belongs to its inline controls (e.g. the volume slider), not a
             // paint stroke or rubber-band select.
             if (inLaneGutter(e.ScreenSpaceMouseDownPosition))
@@ -2130,6 +2157,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         protected override void OnDrag(DragEvent e)
         {
+            if (scrollDragging)
+            {
+                // Content follows the finger: dragging right shows earlier times.
+                float dx = ToLocalSpace(e.ScreenSpaceMousePosition).X - scrollDragStartX;
+                SeekRequested?.Invoke(Math.Max(0, scrollDragStartTime - dx / pixelsPerMs));
+                return;
+            }
+
             if (hitsoundPainting)
                 paintCellAt(timeAt(e.ScreenSpaceMousePosition), paintLaneIndex);
             else if (moving)
@@ -2149,6 +2184,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         protected override void OnDragEnd(DragEndEvent e)
         {
+            if (scrollDragging)
+            {
+                scrollDragging = false;
+                return;
+            }
+
             if (hitsoundPainting)
             {
                 hitsoundPainting = false;

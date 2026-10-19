@@ -176,6 +176,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // Distance snapping: when on, placement is spaced from the previous object proportionally to the time
         // gap (so streams keep slider velocity). Spacing multiplier is adjusted with Alt+scroll, like lazer.
         private readonly BindableBool distanceSnap = new BindableBool();
+        // Phones: the top timeline starts in "Scroll" mode (drag scrolls); "Select" restores desktop-style drag select/move.
+        private readonly BindableBool timelineScroll = new BindableBool(true);
         private bool distanceSnapEnabled
         {
             get => distanceSnap.Value;
@@ -662,6 +664,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 IconSize = 28,
                                 AccentBorder = true,
                             },
+                            new UI.TimelineModeButton(timelineScroll)
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.TopRight,
+                                Margin = new MarginPadding { Right = 266, Top = top_bar_height },
+                                Size = new Vector2(73),
+                            },
                             new IconBarButton(FontAwesome.Solid.TrashAlt, "Delete the selected object(s)", deleteSelectedFromButton)
                             {
                                 Anchor = Anchor.BottomRight,
@@ -1144,6 +1153,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             moddingPanel.OnFiltersChanged = refreshModdingViews;
             moddingPanel.OnSeek = SeekTo;
             topTimeline.ModBubbleClicked = SeekTo;
+            topTimeline.SeekRequested = SeekTo;
+            if (UI.MobileMetrics.IsMobile)
+                timelineScroll.BindValueChanged(v => topTimeline.ScrollMode = v.NewValue, true);
             // Selecting an object in the timeline switches back to the select tool.
             topTimeline.ObjectSelectedHere = () => applyTool(EditorTool.Selection);
 
