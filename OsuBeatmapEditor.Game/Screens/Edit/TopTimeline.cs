@@ -130,6 +130,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public Action<double>? SeekRequested;
 
         private bool scrollDragging;
+        private double? lastScrollTarget;
         private double scrollDragStartTime;
         private float scrollDragStartX;
 
@@ -2068,6 +2069,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (ScrollMode)
             {
                 scrollDragging = true;
+                lastScrollTarget = null;
                 scrollDragStartTime = currentTime();
                 scrollDragStartX = ToLocalSpace(e.ScreenSpaceMouseDownPosition).X;
                 return true;
@@ -2161,7 +2163,17 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 // Content follows the finger: dragging right shows earlier times.
                 float dx = ToLocalSpace(e.ScreenSpaceMousePosition).X - scrollDragStartX;
-                SeekRequested?.Invoke(Math.Max(0, scrollDragStartTime - dx / pixelsPerMs));
+                double raw = Math.Max(0, scrollDragStartTime - dx / pixelsPerMs);
+
+                // Snap to the beat-snap ticks (the | lines, following the current 1/1, 1/2, 1/3, 1/4... divisor), so
+                // the playhead only ever rests on a tick and objects can be placed exactly on beat.
+                double target = nearestTick(raw, out double tick) ? Math.Max(0, tick) : raw;
+                if (!lastScrollTarget.HasValue || Math.Abs(target - lastScrollTarget.Value) > 1e-6)
+                {
+                    lastScrollTarget = target;
+                    SeekRequested?.Invoke(target);
+                }
+
                 return;
             }
 
