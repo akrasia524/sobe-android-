@@ -652,6 +652,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Position = new Vector2(37, 93),
                                 Size = new Vector2(56),
                                 IconSize = 28,
+                                AccentBorder = true,
                             },
                             new IconToggleButton(distanceSnap, FontAwesome.Solid.Magnet, "Distance snap - space new objects by their time gap", 56)
                             {
@@ -659,21 +660,25 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Origin = Anchor.TopLeft,
                                 Position = new Vector2(100, 93),
                                 IconSize = 28,
+                                AccentBorder = true,
                             },
                             new UI.LabelBarButton("Stream", "Convert the selected slider into a stream", convertSliderToStreamFromButton, new Vector2(73))
                             {
+                                AccentBorder = true,
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.TopRight,
                                 Margin = new MarginPadding { Right = 188, Top = 140 },
                             },
                             new UI.LabelBarButton("+SV", "Add an SV (green) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: false), new Vector2(79, 49))
                             {
+                                AccentBorder = true,
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.TopRight,
                                 Margin = new MarginPadding { Right = 81, Top = 140 },
                             },
                             new UI.LabelBarButton("+BPM", "Add a BPM (red) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: true), new Vector2(79, 49))
                             {
+                                AccentBorder = true,
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.TopRight,
                                 Margin = new MarginPadding { Right = 81, Top = 197 },

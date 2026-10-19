@@ -17,6 +17,9 @@ namespace OsuBeatmapEditor.Game.UI
     /// </summary>
     public partial class IconBarButton : ClickableContainer, IHasTooltip
     {
+        /// <summary>Draws a pink (accent) outline like the play/pause button (phone action buttons).</summary>
+        public bool AccentBorder { get; init; }
+
         private readonly IconUsage icon;
         private readonly string tooltip;
         private Box background = null!;
@@ -47,6 +50,8 @@ namespace OsuBeatmapEditor.Game.UI
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Masking = true,
+                BorderThickness = AccentBorder ? 3 : 0,
+                BorderColour = EditorTheme.Colours.Accent,
                 CornerRadius = 5,
                 Children = new Drawable[]
                 {
