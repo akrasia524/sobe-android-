@@ -24,9 +24,38 @@ namespace OsuBeatmapEditor.Android
             // Must be installed before the game thread starts so early crashes are shown on screen.
             CrashReporter.Install(this);
             NativeLibraries.Preload(this);
+            lockLandscape();
             base.OnCreate(savedInstanceState);
+            lockLandscape();
             LibraryActions.Publisher = publishToDownloads;
             PlatformPicker.PickAudio = startAudioPick;
+        }
+
+        // Landscape only, enforced in code as well as by the [Activity] attribute: some phones/ROMs let the surface
+        // rotate to portrait when the game window is (re)created, so the request is re-applied on every lifecycle step.
+        private void lockLandscape()
+        {
+            if (RequestedOrientation != ScreenOrientation.SensorLandscape)
+                RequestedOrientation = ScreenOrientation.SensorLandscape;
+        }
+
+        protected override void OnResume()
+        {
+            lockLandscape();
+            base.OnResume();
+        }
+
+        public override void OnConfigurationChanged(global::Android.Content.Res.Configuration newConfig)
+        {
+            lockLandscape();
+            base.OnConfigurationChanged(newConfig);
+        }
+
+        public override void OnWindowFocusChanged(bool hasFocus)
+        {
+            if (hasFocus)
+                lockLandscape();
+            base.OnWindowFocusChanged(hasFocus);
         }
 
         /// <summary>

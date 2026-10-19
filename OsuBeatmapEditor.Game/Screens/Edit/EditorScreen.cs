@@ -638,26 +638,46 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 },
                 // Phones only: on-screen buttons for editor actions that are keyboard-only shortcuts on desktop
                 // (Timing points F6, Distance snap Y, Convert slider to stream, Add BPM point, Add SV point).
+                // Sizes/positions are in design units, taken from the user's marked-up screenshot.
                 UI.MobileMetrics.IsMobile
-                    ? new FillFlowContainer
+                    ? new Container
                     {
-                        Anchor = Anchor.BottomLeft,
-                        Origin = Anchor.BottomLeft,
-                        Margin = new MarginPadding { Left = bottom_left_ring_x, Bottom = bottom_bar_height + 12 + bottom_left_button + bottom_left_gap },
-                        AutoSizeAxes = Axes.Both,
-                        Direction = FillDirection.Horizontal,
-                        Spacing = new Vector2(bottom_left_gap, 0),
+                        RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
                         {
                             new IconBarButton(FontAwesome.Solid.Clock, "Timing points", () => toggleEditorOverlay(timingPointsOverlay))
                             {
-                                Size = new Vector2(bottom_left_button),
-                                IconSize = bottom_left_icon,
+                                Anchor = Anchor.TopLeft,
+                                Origin = Anchor.TopLeft,
+                                Position = new Vector2(37, 93),
+                                Size = new Vector2(56),
+                                IconSize = 28,
                             },
-                            new IconToggleButton(distanceSnap, FontAwesome.Solid.Magnet, "Distance snap - space new objects by their time gap", bottom_left_button) { IconSize = bottom_left_icon },
-                            new UI.LabelBarButton("Stream", "Convert the selected slider into a stream", convertSelectedSliderToStream, new Vector2(bottom_left_button + 14, bottom_left_button)),
-                            new UI.LabelBarButton("+BPM", "Add a BPM (red) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: true), new Vector2(bottom_left_button + 6, bottom_left_button)),
-                            new UI.LabelBarButton("+SV", "Add an SV (green) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: false), new Vector2(bottom_left_button, bottom_left_button)),
+                            new IconToggleButton(distanceSnap, FontAwesome.Solid.Magnet, "Distance snap - space new objects by their time gap", 56)
+                            {
+                                Anchor = Anchor.TopLeft,
+                                Origin = Anchor.TopLeft,
+                                Position = new Vector2(100, 93),
+                                IconSize = 28,
+                            },
+                            new UI.LabelBarButton("Stream", "Convert the selected slider into a stream", convertSliderToStreamFromButton, new Vector2(73))
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.TopRight,
+                                Margin = new MarginPadding { Right = 188, Top = 140 },
+                            },
+                            new UI.LabelBarButton("+SV", "Add an SV (green) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: false), new Vector2(79, 49))
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.TopRight,
+                                Margin = new MarginPadding { Right = 81, Top = 140 },
+                            },
+                            new UI.LabelBarButton("+BPM", "Add a BPM (red) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: true), new Vector2(79, 49))
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.TopRight,
+                                Margin = new MarginPadding { Right = 81, Top = 197 },
+                            },
                         },
                     }
                     : Empty(),
@@ -4143,6 +4163,24 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// count (what osu!stable's "convert slider to stream" would use). While the panel is open the stream is
         /// previewed live on the playfield via <see cref="refreshStreamPreview"/>; confirm/cancel commit or undo it.
         /// </summary>
+        /// <summary>The on-screen Stream button: like the shortcut, but says why nothing happened.</summary>
+        private void convertSliderToStreamFromButton()
+        {
+            if (streamOriginal != null)
+                return;
+
+            bool oneSlider = selection.Selected.Count == 1
+                && parsed.HitObjects.Any(o => o.Id == selection.Selected.First() && o.Kind == HitObjectKind.Slider);
+
+            if (!oneSlider)
+            {
+                toasts?.Push("Select a slider first", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            convertSelectedSliderToStream();
+        }
+
         private void convertSelectedSliderToStream()
         {
             if (streamOriginal != null)
