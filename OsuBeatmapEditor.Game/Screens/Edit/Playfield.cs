@@ -1283,6 +1283,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // sharp corner (red anchor), matching osu!lazer.
             if (SliderPlacementActive)
             {
+                // Phones: tapping anywhere OUTSIDE the mapping field confirms the slider being drawn (instead of needing
+                // a long-press / right-click on the last anchor). Needs a head + one more anchor, like right-click.
+                if (UI.MobileMetrics.IsMobile && buildingSlider && !insidePlayfield(playArea.ToLocalSpace(e.ScreenSpaceMousePosition)))
+                {
+                    finishSlider();
+                    return true;
+                }
+
                 double now = Time.Current;
                 bool doubleClick = buildingSlider && now - lastAnchorClickTime < 250;
                 lastAnchorClickTime = now;
