@@ -2658,8 +2658,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>The beat-snapped current time (the time a placed object would receive).</summary>
         private double snappedNow() => SnappedTimeSource?.Invoke() ?? TimeSource?.Invoke() ?? 0;
 
+        /// <summary>The colour a NEW combo started at the current time would get (the next colour after the current combo).</summary>
+        public Color4 NextNewComboColour() => previewCombo(forceNewCombo: true).colour;
+
         /// <summary>The combo colour and number a circle placed at the current time would receive.</summary>
-        private (Color4 colour, int number) previewCombo()
+        private (Color4 colour, int number) previewCombo(bool forceNewCombo = false)
         {
             // Count only objects the playhead has actually reached on screen. The snapped placement time can round FORWARD
             // past the next object, and the playfield draws by the (audio-offset) visual clock, so using the snapped time
@@ -2689,7 +2692,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             // A new combo (Q) or the very first object restarts the count on the next colour.
-            if (NewComboArmed || !anyBefore)
+            if (forceNewCombo || NewComboArmed || !anyBefore)
                 return (comboColour(anyBefore ? prevIndex + 1 : 0), 1);
 
             return (comboColour(prevIndex), prevNumber + 1);

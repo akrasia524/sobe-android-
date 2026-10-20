@@ -671,6 +671,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Margin = new MarginPadding { Right = 266, Top = top_bar_height },
                                 Size = new Vector2(73),
                             },
+                            new UI.NewComboButton(toggleNewCombo, () => playfield.NextNewComboColour(), newComboIsOn)
+                            {
+                                Anchor = Anchor.BottomLeft,
+                                Origin = Anchor.Centre,
+                                Position = new Vector2(296, -91),
+                                Size = new Vector2(80),
+                            },
                             new IconBarButton(FontAwesome.Solid.TrashAlt, "Delete the selected object(s)", deleteSelectedFromButton)
                             {
                                 Anchor = Anchor.BottomRight,
@@ -3125,6 +3132,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// Toggles "new combo" - on the selected objects if any are selected, otherwise arming it for the
         /// next placed circle (the placement preview reflects it).
         /// </summary>
+        /// <summary>Whether "new combo" is currently on: set on every selected object, or armed for the next placement.</summary>
+        private bool newComboIsOn()
+        {
+            if (selection.Selected.Count == 0)
+                return playfield.NewComboArmed;
+
+            var ids = new HashSet<int>(selection.Selected);
+            return parsed.HitObjects.Where(o => ids.Contains(o.Id)).All(o => HitObjectLineEditor.HasNewCombo(o.RawLine));
+        }
+
         private void toggleNewCombo()
         {
             if (selection.Selected.Count > 0)
