@@ -7338,6 +7338,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 host.Window.Title = $"{set.Artist} - {set.Title} [{difficulty.DifficultyName}]";
 
             this.FadeInFromZero(300, Easing.OutQuint);
+
+            // No audio = the clock can't run (time stays at 00:00:00 and nothing plays or scrolls); say why instead of looking frozen.
+            if (track == null || track.Length <= 0)
+            {
+                string named = string.IsNullOrEmpty(parsed.AudioFilename) ? "no audio file named in the map" : $"\"{parsed.AudioFilename}\"";
+                Scheduler.AddDelayed(() => toasts?.Push($"This map's audio could not be loaded ({named}), so it can't play. Re-import it with its audio file.", EditorTheme.Colours.Error), 600);
+            }
         }
 
         public override bool OnExiting(ScreenExitEvent e)
