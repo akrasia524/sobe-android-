@@ -491,7 +491,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
             string ext = Path.GetExtension(path).ToLowerInvariant();
 
-            if (ext == ".osz")
+            if (ext == ".osz" || ext == ".zip")
             {
                 importOsz(path);
                 return;
@@ -509,7 +509,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
 
             if (!NewBeatmapOverlay.AudioExtensions.Contains(ext))
             {
-                toasts?.Push("Drop an .osz (map), .osk (skin), or an mp3/ogg/wav to start a new beatmap", EditorTheme.Colours.Warning);
+                toasts?.Push("Drop an .osz / .zip (map), .osk (skin), or an mp3/ogg/wav to start a new beatmap", EditorTheme.Colours.Warning);
                 return;
             }
 
@@ -568,8 +568,24 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         /// <summary>Opens the system file picker for an .osz / .osu and imports the chosen file.</summary>
         private void onImportClicked()
         {
+            // Android: the same chooser as "New beatmap" (system picker plus any installed file manager).
+            if (PlatformPicker.PickMap is { } pickMap)
+            {
+                pickMap(result => Schedule(() =>
+                {
+                    if (result.Cancelled)
+                        return;
+
+                    if (result.Error != null)
+                        toasts?.Push(result.Error, EditorTheme.Colours.Error);
+                    else if (result.Path != null)
+                        importOsz(result.Path, deleteAfter: true);
+                }));
+                return;
+            }
+
             importSelector?.Dispose();
-            importSelector = gameHost.CreateSystemFileSelector(new[] { ".osz", ".osu" });
+            importSelector = gameHost.CreateSystemFileSelector(new[] { ".osz", ".zip", ".osu" });
 
             if (importSelector == null)
             {
@@ -582,11 +598,30 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
         }
 
         /// <summary>Imports a dropped <c>.osz</c> into osu!lazer's realm off-thread, then toasts + refreshes.</summary>
-        private void importOsz(string oszPath)
+        private void importOsz(string oszPath, bool deleteAfter = false)
         {
             toasts?.Push($"Importing {Path.GetFileName(oszPath)}...");
 
             Task.Run(() =>
+            {
+                try
+                {
+                    importOszCore(oszPath);
+                }
+                finally
+                {
+                    // A file the chooser copied into the app cache is only needed for the import itself.
+                    if (deleteAfter)
+                    {
+                        try { Directory.Delete(Path.GetDirectoryName(oszPath)!, true); }
+                        catch (Exception) { }
+                    }
+                }
+            });
+        }
+
+        private void importOszCore(string oszPath)
+        {
             {
                 // On phones the app-owned library is the destination (osu!lazer's realm does not exist there);
                 // the desktop build keeps importing into lazer until the library migration reaches it.
@@ -618,7 +653,7 @@ namespace OsuBeatmapEditor.Game.Screens.SongSelect
                         toasts?.Push(message, EditorTheme.Colours.Error);
                     }
                 });
-            });
+            }
         }
 
         /// <summary>

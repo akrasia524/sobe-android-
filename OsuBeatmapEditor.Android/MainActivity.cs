@@ -29,6 +29,7 @@ namespace OsuBeatmapEditor.Android
             lockLandscape();
             LibraryActions.Publisher = publishToDownloads;
             PlatformPicker.PickAudio = startAudioPick;
+            PlatformPicker.PickMap = startMapPick;
         }
 
         // Landscape only, enforced in code as well as by the [Activity] attribute: some phones/ROMs let the surface
@@ -126,8 +127,109 @@ namespace OsuBeatmapEditor.Android
             }
         }
 
+        private const int map_pick_request = 0x50AE;
+        private System.Action<PickResult>? pendingMapPick;
+
+        /// <summary>
+        /// Opens the same chooser for a beatmap file (.osz / .zip / .osu). No MIME filter: file managers report .osz as
+        /// octet-stream, so a filter would hide it. The import itself recognises the file by its contents.
+        /// </summary>
+        private void startMapPick(System.Action<PickResult> done)
+        {
+            pendingMapPick = done;
+
+            try
+            {
+                var intent = new Intent(Intent.ActionGetContent);
+                intent.AddCategory(Intent.CategoryOpenable);
+                intent.SetType("*/*");
+                intent.PutExtra(Intent.ExtraAllowMultiple, false);
+
+                StartActivityForResult(Intent.CreateChooser(intent, "Choose a beatmap (.osz / .zip)"), map_pick_request);
+            }
+            catch (System.Exception e)
+            {
+                pendingMapPick = null;
+                done(new PickResult(null, "Could not open a file chooser: " + e.Message));
+            }
+        }
+
+        private const long max_map_bytes = 1024L * 1024 * 1024;
+
+        /// <summary>Copies the chosen beatmap file into the app cache (keeping its name) so the import can read it as a normal file.</summary>
+        private PickResult copyPickedMap(global::Android.Net.Uri uri)
+        {
+            string? dir = null;
+
+            try
+            {
+                string? displayName = null;
+                using (var cursor = ContentResolver!.Query(uri, new[] { "_display_name" }, null, null, null))
+                {
+                    if (cursor != null && cursor.MoveToFirst())
+                        displayName = cursor.GetString(0);
+                }
+
+                string raw = !string.IsNullOrWhiteSpace(displayName) ? displayName! : uri.LastPathSegment ?? "beatmap";
+                int cut = raw.LastIndexOfAny(new[] { '/', '\\', ':' });
+                if (cut >= 0)
+                    raw = raw.Substring(cut + 1);
+
+                string name = LibraryActions.SafeFileName(raw);
+
+                dir = System.IO.Path.Combine(CacheDir!.AbsolutePath, "map-pick", System.Guid.NewGuid().ToString("N"));
+                System.IO.Directory.CreateDirectory(dir);
+                string target = System.IO.Path.Combine(dir, name);
+
+                using (var input = ContentResolver.OpenInputStream(uri))
+                {
+                    if (input == null)
+                        return new PickResult(null, "The chosen app did not provide the file.");
+
+                    using var output = System.IO.File.Create(target);
+                    byte[] buffer = new byte[81920];
+                    long total = 0;
+                    int n;
+
+                    while ((n = input.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        total += n;
+                        if (total > max_map_bytes)
+                            throw new System.IO.IOException("the file is larger than 1 GB");
+
+                        output.Write(buffer, 0, n);
+                    }
+                }
+
+                return new PickResult(target, null);
+            }
+            catch (System.Exception e)
+            {
+                tryDeleteDir(dir);
+                return new PickResult(null, "Could not read the chosen file: " + e.Message);
+            }
+        }
+
         protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
         {
+            if (requestCode == map_pick_request)
+            {
+                var mapDone = pendingMapPick;
+                pendingMapPick = null;
+                if (mapDone == null)
+                    return;
+
+                var mapUri = data?.Data ?? data?.ClipData?.GetItemAt(0)?.Uri;
+                if (resultCode != Result.Ok || mapUri == null)
+                {
+                    mapDone(new PickResult(null, null)); // cancelled
+                    return;
+                }
+
+                System.Threading.Tasks.Task.Run(() => mapDone(copyPickedMap(mapUri)));
+                return;
+            }
+
             if (requestCode != audio_pick_request)
             {
                 base.OnActivityResult(requestCode, resultCode, data);

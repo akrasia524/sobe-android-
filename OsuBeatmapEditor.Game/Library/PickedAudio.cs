@@ -17,6 +17,12 @@ namespace OsuBeatmapEditor.Game.Library
     public static class PlatformPicker
     {
         public static Action<Action<PickResult>>? PickAudio { get; set; }
+
+        /// <summary>
+        /// Set by the Android host: opens the same kind of chooser for one beatmap file (.osz / .zip / .osu), copies the choice
+        /// into app storage and calls back with the local path. Null where no such picker exists (desktop uses the system dialog).
+        /// </summary>
+        public static Action<Action<PickResult>>? PickMap { get; set; }
     }
 
     /// <summary>Checks and names audio files that came from a file chooser. UI- and Android-free so it can be tested.</summary>
