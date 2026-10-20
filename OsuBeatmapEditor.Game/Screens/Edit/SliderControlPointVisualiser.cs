@@ -327,6 +327,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             selectedIndices.Add(index);
             applySelectionVisual();
 
+            // Phones: there is no right-click, and a long-press was a hassle - a single tap on a handle opens the
+            // curve-type menu (Smooth / Linear / Perfect curve / Bezier / Delete).
+            if (UI.MobileMetrics.IsMobile)
+                showContextMenu(index, controlPoints[index].Position);
+
             if (index == 0)
                 PartNodeClicked?.Invoke(0);
             else if (index == controlPoints.Count - 1)
@@ -382,10 +387,107 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             if (!nearPath(pos, Math.Max(8f, diameter / 2f)))
+            {
+                closeAddPrompt();
                 return false; // clicks away from the body fall through to the playfield
+            }
 
+            // Phones: a tap close to the slider's centre LINE offers a small round "+" to add an anchor there; a tap on
+            // the wide body away from the line still selects the body (orange) so the slider can be moved comfortably.
+            if (UI.MobileMetrics.IsMobile)
+            {
+                float lineRadius = Math.Max(9f, diameter * 0.22f);
+                if (nearestOnPath(pos, out Vector2 onPath, out float lineDistance) && lineDistance <= lineRadius)
+                {
+                    showAddPrompt(onPath);
+                    return true;
+                }
+            }
+
+            closeAddPrompt();
             BodyClicked?.Invoke(); // selecting the body part keeps this slider selected
             return true;
+        }
+
+        private Container? addPrompt;
+
+        /// <summary>The closest point on the rendered slider path to <paramref name="p"/>, and its distance.</summary>
+        private bool nearestOnPath(Vector2 p, out Vector2 closest, out float distance)
+        {
+            closest = p;
+            distance = float.MaxValue;
+
+            var path = SliderGeometry.ComputePath(controlPoints, pixelLength);
+            for (int i = 1; i < path.Count; i++)
+            {
+                Vector2 a = path[i - 1], ab = path[i] - a;
+                float lengthSq = ab.LengthSquared;
+                float t = lengthSq <= 0 ? 0 : Math.Clamp(Vector2.Dot(p - a, ab) / lengthSq, 0, 1);
+                Vector2 q = a + ab * t;
+                float d = Vector2.Distance(p, q);
+                if (d < distance)
+                {
+                    distance = d;
+                    closest = q;
+                }
+            }
+
+            return distance < float.MaxValue;
+        }
+
+        /// <summary>Inserts a new anchor at <paramref name="at"/> (on the nearest polygon segment), grid-snapped when enabled.</summary>
+        private void insertAnchorAt(Vector2 at)
+        {
+            int insertAt = nearestSegmentIndex(at);
+            controlPoints.Insert(insertAt, new SliderControlPoint(SnapToGrid?.Invoke(at) ?? at));
+            actions.UpdateSliderAnchors(sliderId, controlPoints.ToArray());
+        }
+
+        /// <summary>
+        /// Shows a small round white "+" next to the tapped spot on the slider line (and a tiny ring on the exact spot);
+        /// tapping the "+" adds an anchor there. Tapping anywhere else dismisses it (or moves it, if on the line).
+        /// </summary>
+        private void showAddPrompt(Vector2 at)
+        {
+            closeAddPrompt();
+            closeContextMenu();
+
+            const float button_size = 34f;
+            Vector2 buttonPos = new Vector2(
+                Math.Clamp(at.X + button_size, button_size, ParsedBeatmap.PLAYFIELD_WIDTH - button_size),
+                Math.Clamp(at.Y - button_size, button_size, ParsedBeatmap.PLAYFIELD_HEIGHT - button_size));
+
+            addPrompt = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Children = new Drawable[]
+                {
+                    new ClickCatcher { Action = closeAddPrompt, PassThrough = true },
+                    new CircularContainer
+                    {
+                        Origin = Anchor.Centre,
+                        Position = at,
+                        Size = new Vector2(10),
+                        Masking = true,
+                        BorderThickness = 2f,
+                        BorderColour = Color4.White,
+                        Child = new Box { RelativeSizeAxes = Axes.Both, Colour = Color4.Transparent },
+                    },
+                    new AddPointButton(() => insertAnchorAt(at))
+                    {
+                        Origin = Anchor.Centre,
+                        Position = buttonPos,
+                        Size = new Vector2(button_size),
+                    },
+                },
+            };
+            AddInternal(addPrompt);
+        }
+
+        private void closeAddPrompt()
+        {
+            addPrompt?.Expire();
+            addPrompt = null;
         }
 
         private int nearestSegmentIndex(Vector2 p)
@@ -480,6 +582,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Colour = colour,
                     Alpha = 0.9f,
                 };
+            }
+
+            // Phones: a bigger invisible touch target around the small handle so a finger can hit it reliably.
+            public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+            {
+                if (!UI.MobileMetrics.IsMobile)
+                    return base.ReceivePositionalInputAt(screenSpacePos);
+
+                float radius = Math.Max(DrawWidth / 2f, 18f);
+                return Vector2.Distance(ToLocalSpace(screenSpacePos), DrawSize / 2f) <= radius;
             }
 
             /// <summary>Highlights this handle when it is part of the multi-selection (a thicker yellow ring).</summary>
@@ -615,10 +727,49 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
         }
 
+        /// <summary>Small round white "+" button (accent outline, like the other phone action buttons) that adds an anchor.</summary>
+        private partial class AddPointButton : ClickableContainer
+        {
+            public AddPointButton(Action onClick)
+            {
+                Action = onClick;
+            }
+
+            [osu.Framework.Allocation.BackgroundDependencyLoader]
+            private void load()
+            {
+                Child = new CircularContainer
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Masking = true,
+                    BorderThickness = 2.5f,
+                    BorderColour = EditorTheme.Colours.Accent,
+                    Children = new Drawable[]
+                    {
+                        new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Control },
+                        new SpriteIcon
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Icon = FontAwesome.Solid.Plus,
+                            Size = new Vector2(15),
+                            Colour = Color4.White,
+                        },
+                    },
+                };
+            }
+
+            // Consume the press so the full-area catcher behind never dismisses the prompt before this click resolves.
+            protected override bool OnMouseDown(MouseDownEvent e) => true;
+        }
+
         /// <summary>A transparent full-area layer behind the menu that closes it when clicked.</summary>
         private partial class ClickCatcher : Drawable
         {
             public Action? Action;
+
+            /// <summary>When true the click closes the layer but is NOT consumed, so it still reaches the slider/handles underneath.</summary>
+            public bool PassThrough;
 
             public ClickCatcher()
             {
@@ -631,7 +782,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             protected override bool OnClick(ClickEvent e)
             {
                 Action?.Invoke();
-                return true;
+                return !PassThrough;
             }
 
             protected override bool OnMouseDown(MouseDownEvent e)
