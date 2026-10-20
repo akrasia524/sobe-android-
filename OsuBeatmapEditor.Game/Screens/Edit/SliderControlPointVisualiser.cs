@@ -386,6 +386,19 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return true;
             }
 
+            // Phones: the red control-polygon lines between anchors (they can run outside the slider body) also accept a
+            // tap to offer the "+", so an anchor can be added along them too - after the centre-line check below.
+            if (UI.MobileMetrics.IsMobile)
+            {
+                float lineRadius0 = Math.Max(9f, diameter * 0.22f);
+                bool onLine = nearestOnPath(pos, out _, out float lineDist0) && lineDist0 <= lineRadius0;
+                if (!onLine && nearestOnPolygon(pos, out Vector2 onPoly, out float polyDist) && polyDist <= Math.Max(10f, diameter * 0.2f))
+                {
+                    showAddPrompt(onPoly);
+                    return true;
+                }
+            }
+
             if (!nearPath(pos, Math.Max(8f, diameter / 2f)))
             {
                 closeAddPrompt();
@@ -435,6 +448,29 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             return distance < float.MaxValue;
         }
 
+        /// <summary>The closest point on the red control-polygon lines to <paramref name="p"/>, and its distance.</summary>
+        private bool nearestOnPolygon(Vector2 p, out Vector2 closest, out float distance)
+        {
+            closest = p;
+            distance = float.MaxValue;
+
+            for (int i = 1; i < controlPoints.Count; i++)
+            {
+                Vector2 a = controlPoints[i - 1].Position, ab = controlPoints[i].Position - a;
+                float lengthSq = ab.LengthSquared;
+                float t = lengthSq <= 0 ? 0 : Math.Clamp(Vector2.Dot(p - a, ab) / lengthSq, 0, 1);
+                Vector2 q = a + ab * t;
+                float d = Vector2.Distance(p, q);
+                if (d < distance)
+                {
+                    distance = d;
+                    closest = q;
+                }
+            }
+
+            return distance < float.MaxValue;
+        }
+
         /// <summary>Inserts a new anchor at <paramref name="at"/> (on the nearest polygon segment), grid-snapped when enabled.</summary>
         private void insertAnchorAt(Vector2 at)
         {
@@ -452,7 +488,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             closeAddPrompt();
             closeContextMenu();
 
-            const float button_size = 34f;
+            const float button_size = 47f; // same on-screen size as the clock button
             Vector2 buttonPos = new Vector2(
                 Math.Clamp(at.X + button_size, button_size, ParsedBeatmap.PLAYFIELD_WIDTH - button_size),
                 Math.Clamp(at.Y - button_size, button_size, ParsedBeatmap.PLAYFIELD_HEIGHT - button_size));
@@ -752,7 +788,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
                             Icon = FontAwesome.Solid.Plus,
-                            Size = new Vector2(15),
+                            Size = new Vector2(22),
                             Colour = Color4.White,
                         },
                     },
