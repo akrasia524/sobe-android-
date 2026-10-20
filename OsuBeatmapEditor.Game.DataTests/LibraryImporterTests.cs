@@ -42,6 +42,32 @@ namespace OsuBeatmapEditor.Game.DataTests
         }
 
         [Test]
+        public void ImportsAZipOfAWholeMapFolder()
+        {
+            string path = incoming("Folder Map.zip");
+            using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+            {
+                using (var s = zip.CreateEntry("123 Test Artist - Test Song/map.osu").Open())
+                    s.Write(Encoding.UTF8.GetBytes(Fixtures.Full));
+                using (var s = zip.CreateEntry("123 Test Artist - Test Song/audio.mp3").Open())
+                    s.Write(new byte[] { 1, 2, 3 });
+            }
+
+            var outcome = LibraryImporter.ImportFile(store, path);
+
+            Assert.That(outcome.Success, Is.True, outcome.Message);
+            Assert.That(File.Exists(Path.Combine(store.FilesDirectory(outcome.Set!.Id), "map.osu")), "files sit at the set root, not in a wrapper folder");
+            Assert.That(File.Exists(Path.Combine(store.FilesDirectory(outcome.Set.Id), "audio.mp3")));
+        }
+
+        [Test]
+        public void RecognisesAnArchiveEvenWithNoOrAWrongExtension()
+        {
+            string noExt = writeOsz("picked-file", Fixtures.Full);
+            Assert.That(LibraryImporter.ImportFile(store, noExt).Success, Is.True);
+        }
+
+        [Test]
         public void ImportsAnOszAndNamesItForTheToast()
         {
             var outcome = LibraryImporter.ImportFile(store, writeOsz("a.osz", Fixtures.Full));
@@ -108,7 +134,7 @@ namespace OsuBeatmapEditor.Game.DataTests
                 Assert.That(outcome.Set, Is.Null, path);
             }
 
-            Assert.That(LibraryImporter.ImportFile(store, incoming("notes.txt")).Message, Does.Contain(".osz or .osu"));
+            Assert.That(LibraryImporter.ImportFile(store, incoming("notes.txt")).Message, Does.Contain(".osz, .zip or .osu"));
             Assert.That(LibraryImporter.ImportFile(store, incoming("taiko.osu")).Message, Does.Contain("osu!standard"));
             Assert.That(store.Sets, Is.Empty);
             Assert.That(Directory.GetDirectories(Path.Combine(root, "library", "sets")), Is.Empty);

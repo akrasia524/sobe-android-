@@ -141,6 +141,8 @@ namespace OsuBeatmapEditor.Game.Library
                     if (entries.Count == 0)
                         throw new ArchiveException("This archive is empty.");
 
+                    entries = stripSingleRootFolder(entries);
+
                     Directory.CreateDirectory(tempRoot);
                     string root = Path.GetFullPath(tempRoot) + Path.DirectorySeparatorChar;
                     long total = 0;
@@ -183,6 +185,34 @@ namespace OsuBeatmapEditor.Game.Library
                     throw new ArchiveException("This archive is damaged and could not be read.", ex);
                 }
             }
+        }
+
+        /// <summary>
+        /// A map folder zipped as a whole ("[id] Artist - Title/map.osu", "[id] Artist - Title/audio.mp3", ...) has every file
+        /// under ONE top-level folder. The set's files must sit at the root, so that wrapper folder is removed. Archives
+        /// with any file at the root, or with several top-level folders, are left exactly as they are.
+        /// </summary>
+        internal static List<(ZipArchiveEntry entry, string name)> stripSingleRootFolder(List<(ZipArchiveEntry entry, string name)> entries)
+        {
+            string? root = null;
+
+            foreach (var (_, name) in entries)
+            {
+                int slash = name.IndexOf('/');
+                if (slash <= 0)
+                    return entries; // a file at the archive root: nothing to strip
+
+                string first = name.Substring(0, slash);
+                if (root == null)
+                    root = first;
+                else if (!string.Equals(root, first, StringComparison.Ordinal))
+                    return entries; // more than one top-level folder
+            }
+
+            if (root == null)
+                return entries;
+
+            return entries.Select(e => (e.entry, e.name.Substring(root.Length + 1))).ToList();
         }
 
         private static readonly HashSet<string> already_compressed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

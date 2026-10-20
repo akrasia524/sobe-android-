@@ -27,22 +27,28 @@ namespace OsuBeatmapEditor.Game.Library
 
                 ImportResult result;
 
-                switch (Path.GetExtension(path).ToLowerInvariant())
+                // Decide by the file's contents first: a file manager can hand over a name with no (or a wrong) extension, and
+                // a .zip of a map folder is the same archive format as an .osz.
+                switch (detectKind(path))
                 {
-                    case ".osz":
+                    case FileKind.Archive:
                         using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                             result = store.ImportOsz(stream);
                         break;
 
-                    case ".osu":
+                    case FileKind.Osu:
                         if (new FileInfo(path).Length > MAX_OSU_BYTES)
                             return ImportOutcome.Fail("That file is too large to be a beatmap.");
 
-                        result = store.ImportOsu(Path.GetFileName(path), File.ReadAllBytes(path));
+                        string osuName = Path.GetFileName(path);
+                        if (!osuName.EndsWith(".osu", StringComparison.OrdinalIgnoreCase))
+                            osuName += ".osu";
+
+                        result = store.ImportOsu(osuName, File.ReadAllBytes(path));
                         break;
 
                     default:
-                        return ImportOutcome.Fail("Unsupported file type: choose an .osz or .osu file.");
+                        return ImportOutcome.Fail("Unsupported file type: choose an .osz, .zip or .osu file.");
                 }
 
                 return new ImportOutcome(true, describe(result), result.Set, result.Status);
@@ -59,6 +65,32 @@ namespace OsuBeatmapEditor.Game.Library
             {
                 return ImportOutcome.Fail("The import failed unexpectedly. Nothing was added to your library.");
             }
+        }
+
+        private enum FileKind { Unknown, Archive, Osu }
+
+        /// <summary>Zip magic bytes mean an archive (.osz / .zip, whatever the name); otherwise an .osu by extension or header text.</summary>
+        private static FileKind detectKind(string path)
+        {
+            byte[] head = new byte[64];
+            int read;
+
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                read = fs.Read(head, 0, head.Length);
+
+            if (read >= 4 && head[0] == 'P' && head[1] == 'K' && (head[2] == 3 || head[2] == 5) && (head[3] == 4 || head[3] == 6))
+                return FileKind.Archive;
+
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+
+            if (ext == ".osz" || ext == ".zip")
+                return FileKind.Archive; // not a zip by content: the archive reader reports it as damaged
+
+            if (ext == ".osu")
+                return FileKind.Osu;
+
+            string headText = System.Text.Encoding.UTF8.GetString(head, 0, read).TrimStart('\uFEFF', ' ', '\r', '\n');
+            return headText.StartsWith("osu file format", StringComparison.OrdinalIgnoreCase) ? FileKind.Osu : FileKind.Unknown;
         }
 
         private static string describe(ImportResult result)
