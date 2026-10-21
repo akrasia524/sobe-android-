@@ -105,7 +105,9 @@ namespace OsuBeatmapEditor.Game.Library
             }
             catch (Exception ex) when (ex is InvalidDataException or NotSupportedException or IOException)
             {
-                throw new ArchiveException("This file is not a valid .osz archive.", ex);
+                long size = -1;
+                try { size = zip.Length; } catch (NotSupportedException) { }
+                throw new ArchiveException($"This file is not a valid .osz / .zip archive ({ex.GetType().Name}: {ex.Message} - file size {size} bytes).", ex);
             }
 
             using (archive)

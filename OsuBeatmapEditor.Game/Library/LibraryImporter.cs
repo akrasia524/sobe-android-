@@ -27,6 +27,13 @@ namespace OsuBeatmapEditor.Game.Library
 
                 ImportResult result;
 
+                var info = new FileInfo(path);
+                if (info.Length == 0)
+                    return ImportOutcome.Fail("The file is empty - the chosen app may not have shared it completely. Try picking it again.");
+
+                if (foreignArchiveName(path) is { } foreign)
+                    return ImportOutcome.Fail($"This is a {foreign} file, not a ZIP. Compress the map folder as a ZIP (.zip) and try again.");
+
                 // Decide by the file's contents first: a file manager can hand over a name with no (or a wrong) extension, and
                 // a .zip of a map folder is the same archive format as an .osz.
                 switch (detectKind(path))
@@ -65,6 +72,24 @@ namespace OsuBeatmapEditor.Game.Library
             {
                 return ImportOutcome.Fail("The import failed unexpectedly. Nothing was added to your library.");
             }
+        }
+
+        /// <summary>The name of a non-zip archive format (7z / RAR / gzip) recognised by its signature, else null.</summary>
+        private static string? foreignArchiveName(string path)
+        {
+            byte[] h = new byte[6];
+            int read;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                read = fs.Read(h, 0, h.Length);
+
+            if (read >= 6 && h[0] == 0x37 && h[1] == 0x7A && h[2] == 0xBC && h[3] == 0xAF && h[4] == 0x27 && h[5] == 0x1C)
+                return ".7z";
+            if (read >= 4 && h[0] == 'R' && h[1] == 'a' && h[2] == 'r' && h[3] == '!')
+                return ".rar";
+            if (read >= 2 && h[0] == 0x1F && h[1] == 0x8B)
+                return ".gz / .tar.gz";
+
+            return null;
         }
 
         private enum FileKind { Unknown, Archive, Osu }
