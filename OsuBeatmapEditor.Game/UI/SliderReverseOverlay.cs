@@ -25,6 +25,10 @@ namespace OsuBeatmapEditor.Game.UI
         // Typed freely (digits only, up to 4 of them).
         private readonly BindableInt reverses = new BindableInt(1) { MinValue = 0, MaxValue = 9999 };
 
+        // The drag bar spans a comfortable 0-16; the number box can go far past it (typed), like the stream panel.
+        private readonly BindableInt reversesBar = new BindableInt(1) { MinValue = 0, MaxValue = 16 };
+        private bool syncing;
+
         private Container panel = null!;
 
         protected override bool StartHidden => true;
@@ -110,6 +114,18 @@ namespace OsuBeatmapEditor.Game.UI
                                             },
                                         },
                                     },
+                                    new Container
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                        Height = 12,
+                                        Child = new BasicSliderBar<int>
+                                        {
+                                            RelativeSizeAxes = Axes.Both,
+                                            Current = reversesBar,
+                                            BackgroundColour = EditorTheme.Colours.Sunken,
+                                            SelectionColour = EditorTheme.Colours.Selection,
+                                        },
+                                    },
                                     new SpriteText
                                     {
                                         Text = "0 = one way, 1 = out and back, 2 = out, back, out...",
@@ -137,6 +153,29 @@ namespace OsuBeatmapEditor.Game.UI
                     },
                 },
             };
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            // Two-way sync between the true count and the bar proxy; typing beyond the bar's range just works.
+            reverses.BindValueChanged(r =>
+            {
+                if (syncing)
+                    return;
+                syncing = true;
+                reversesBar.Value = Math.Clamp(r.NewValue, reversesBar.MinValue, reversesBar.MaxValue);
+                syncing = false;
+            }, true);
+            reversesBar.BindValueChanged(r =>
+            {
+                if (syncing)
+                    return;
+                syncing = true;
+                reverses.Value = r.NewValue;
+                syncing = false;
+            });
         }
 
         /// <summary>Opens the panel seeded with the slider's current reverse count.</summary>
