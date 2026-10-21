@@ -2178,6 +2178,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             switch (tool)
             {
                 case EditorTool.Selection:
+                    // Phones: switching to the Select tool while a slider is being drawn places it (like tapping outside the
+                    // field), so it can be selected and dragged right away instead of being discarded.
+                    if (UI.MobileMetrics.IsMobile)
+                        playfield.ConfirmSliderBuild();
+
                     playfield.SetPlacementActive(false);
                     playfield.SetSliderPlacementActive(false);
                     playfield.SetSpinnerPlacementActive(false);

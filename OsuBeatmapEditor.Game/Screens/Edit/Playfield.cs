@@ -1574,6 +1574,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             cancelSliderBuild();
         }
 
+        /// <summary>Commits the slider being drawn (if it has a head + at least one more anchor), then ends the build.</summary>
+        public void ConfirmSliderBuild()
+        {
+            if (buildingSlider)
+                finishSlider();
+        }
+
         /// <summary>Discards the in-progress slider trace and its preview.</summary>
         public void CancelSliderBuild() => cancelSliderBuild();
 
