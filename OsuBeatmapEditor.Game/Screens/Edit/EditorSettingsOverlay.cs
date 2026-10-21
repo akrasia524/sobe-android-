@@ -57,6 +57,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             toggleRow("Show beta notice on open", settings.ShowBetaPopup),
             description("Shows the welcome / beta disclaimer each time the editor opens."),
             divider(),
+            toggleRow("Hide guide messages", settings.HideTooltips),
+            description("Turns off the small explanation that pops up when you touch a button or handle (for example Stream or "
+                       + "the slider anchors). Applies to everything, including features added in the future."),
+            divider(),
             toggleRow("Discord Rich Presence", settings.DiscordRichPresence),
             description("Shows your current activity (the map you're editing, or browsing) on your Discord profile. "
                        + "Requires the Discord desktop client to be running."));

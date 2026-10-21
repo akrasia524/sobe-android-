@@ -36,6 +36,9 @@ namespace OsuBeatmapEditor.Game
         // the tree so its scheduler can marshal the browser-login callback back onto the update thread.
         private AuthManager auth = null!;
 
+        // The app-wide settings instance (also cached for dependency injection); the tooltip container reads its HideTooltips switch.
+        private Screens.Edit.EditorSettings tooltipSettings = null!;
+
         public override void SetHost(GameHost host)
         {
             base.SetHost(host);
@@ -70,6 +73,7 @@ namespace OsuBeatmapEditor.Game
             // when present instead of constructing their own.
             var editorSettings = new Screens.Edit.EditorSettings(host.Storage);
             deps.CacheAs(editorSettings);
+            tooltipSettings = editorSettings;
             // App-wide skin manager: owns imported .osk skins and tracks the active one (EditorSettings.SkinName).
             // The playfield renderer and hitsound player resolve it to texture/sound hit objects with the user's skin.
             deps.CacheAs(new Skinning.SkinManager(host, editorSettings));
@@ -106,7 +110,7 @@ namespace OsuBeatmapEditor.Game
                 new ScrollCatcher { Scrolled = volume.AdjustMaster },
                 // Wraps the screens so any IHasTooltip drawable (control-point handles, toolbar chips, ...) can
                 // show a hover tooltip; the container tracks the mouse pointer on its own.
-                new TooltipContainer { RelativeSizeAxes = Axes.Both, Child = screenStack = new ScreenStack { RelativeSizeAxes = Axes.Both } },
+                new AppTooltipContainer(tooltipSettings.HideTooltips) { RelativeSizeAxes = Axes.Both, Child = screenStack = new ScreenStack { RelativeSizeAxes = Axes.Both } },
                 // In front of everything so the popup is always visible.
                 volume,
                 // Above even the volume popup so action confirmations are never hidden.
@@ -145,5 +149,21 @@ namespace OsuBeatmapEditor.Game
             applyFirstRunDefaults();
             screenStack.Push(new SongSelectScreen());
         }
+    }
+    /// <summary>
+    /// The app-wide tooltip container. When the "Hide guide messages" setting is on it never shows a tooltip: the appear
+    /// delay becomes effectively infinite, so EVERY <c>IHasTooltip</c> drawable (now and in future) stays silent with no
+    /// per-feature code.
+    /// </summary>
+    internal partial class AppTooltipContainer : osu.Framework.Graphics.Cursor.TooltipContainer
+    {
+        private readonly osu.Framework.Bindables.BindableBool hide;
+
+        public AppTooltipContainer(osu.Framework.Bindables.BindableBool hide)
+        {
+            this.hide = hide;
+        }
+
+        protected override double AppearDelay => hide.Value ? double.MaxValue / 4 : base.AppearDelay;
     }
 }

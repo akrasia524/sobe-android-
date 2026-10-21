@@ -100,6 +100,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public readonly BindableBool AutoUpdate = new BindableBool(true);
 
         /// <summary>
+        /// Hides every hover / touch "guide" tooltip in the app (the small explanation that pops up when a finger rests
+        /// on a button or handle). Applied in ONE place - the app-wide tooltip container - so it also covers any feature
+        /// added later that uses <c>IHasTooltip</c>.
+        /// </summary>
+        public readonly BindableBool HideTooltips = new BindableBool(false);
+
+        /// <summary>
         /// Whether Discord Rich Presence is published while the editor runs, showing your current activity
         /// (editing a map / browsing) on your Discord profile. Desktop-only; requires the Discord client running.
         /// </summary>
@@ -279,6 +286,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             UseMapColours.ValueChanged += _ => save();
             BackgroundDim.ValueChanged += _ => save();
             AutoUpdate.ValueChanged += _ => save();
+            HideTooltips.ValueChanged += _ => save();
             DiscordRichPresence.ValueChanged += _ => save();
             AutoUpdatePrompted.ValueChanged += _ => save();
             PowerSaving.ValueChanged += _ => save();
@@ -345,6 +353,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 if (data.TryGetValue("autoUpdate", out string? autoUp) && bool.TryParse(autoUp, out bool autoUpValue))
                     AutoUpdate.Value = autoUpValue;
+
+                if (data.TryGetValue("hideTooltips", out string? hideTips) && bool.TryParse(hideTips, out bool hideTipsValue))
+                    HideTooltips.Value = hideTipsValue;
 
                 if (data.TryGetValue("discordRichPresence", out string? discord) && bool.TryParse(discord, out bool discordValue))
                     DiscordRichPresence.Value = discordValue;
@@ -434,6 +445,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["powerSaving"] = PowerSaving.Value.ToString();
                 data["autoKeyOverlay"] = AutoKeyOverlay.Value.ToString();
                 data["autoHumanize"] = AutoHumanize.Value.ToString();
+                data["hideTooltips"] = HideTooltips.Value.ToString();
                 data["reviewShowAlways"] = ReviewShowAlways.Value.ToString();
                 data["ignoreBeatmapHitsounds"] = IgnoreBeatmapHitsounds.Value.ToString();
 
