@@ -22,6 +22,14 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Fired when the mapper applies the new reverse count.</summary>
         public Action<int>? Confirmed;
 
+        /// <summary>Fired continuously while the panel is open as the count changes, so the slider can be shown live.</summary>
+        public Action<int>? Preview;
+
+        /// <summary>Fired when the panel closes WITHOUT applying (Cancel / dismissed), so the live preview is undone.</summary>
+        public Action? Cancelled;
+
+        private bool committing;
+
         // Typed freely (digits only, up to 4 of them).
         private readonly BindableInt reverses = new BindableInt(1) { MinValue = 0, MaxValue = 9999 };
 
@@ -162,6 +170,9 @@ namespace OsuBeatmapEditor.Game.UI
             // Two-way sync between the true count and the bar proxy; typing beyond the bar's range just works.
             reverses.BindValueChanged(r =>
             {
+                if (State.Value == Visibility.Visible)
+                    Preview?.Invoke(r.NewValue);
+
                 if (syncing)
                     return;
                 syncing = true;
@@ -181,19 +192,29 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Opens the panel seeded with the slider's current reverse count.</summary>
         public void Show(int currentReverses)
         {
+            committing = false;
             reverses.Value = Math.Clamp(currentReverses, reverses.MinValue, reverses.MaxValue);
             Show();
         }
 
         private void apply()
         {
+            committing = true;
             Confirmed?.Invoke(reverses.Value);
             Hide();
         }
 
         protected override void PopIn() => this.FadeIn(EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
 
-        protected override void PopOut() => this.FadeOut(EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+        protected override void PopOut()
+        {
+            this.FadeOut(EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+
+            // Closed without Apply -> the editor drops the live preview and restores the slider.
+            if (!committing)
+                Cancelled?.Invoke();
+            committing = false;
+        }
 
         /// <summary>A floating panel that blocks input within its own bounds (so taps don't leak to the playfield).</summary>
         private partial class DraggablePanel : Container

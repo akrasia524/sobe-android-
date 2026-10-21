@@ -119,6 +119,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // and whether the count actually changed during the drag.
         private int repeatDragId = -1;
         private HitObjectModel repeatDragOriginal;
+        // Reverse panel (phones): the slider as it was when the panel opened, and a pre-edit snapshot for one undo step.
+        private HitObjectModel? reverseOriginal;
+        private Snapshot? reverseSnapshot;
+        private bool reverseChanged;
         private Snapshot? repeatDragSnapshot;
         private bool repeatDragChanged;
 
@@ -1014,7 +1018,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Confirmed = confirmStreamPreview,
                     Cancelled = cancelStreamPreview,
                 },
-                sliderReverseOverlay = new UI.SliderReverseOverlay { Confirmed = applySliderReverses },
+                sliderReverseOverlay = new UI.SliderReverseOverlay { Preview = previewSliderReverses, Confirmed = applySliderReverses, Cancelled = cancelSliderReversesPreview },
                 patternGallery = new UI.PatternGalleryOverlay
                 {
                     AddToMap = d => pasteObjects(d.Objects, d.SourceVelocities, d.SourceBeatLength),
@@ -4243,7 +4247,59 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return;
             }
 
+            reverseOriginal = slider.Value;
+            reverseSnapshot = takeSnapshot();
+            reverseChanged = false;
             sliderReverseOverlay.Show(Math.Max(0, slider.Value.Slides - 1));
+        }
+
+        /// <summary>Shows the slider with <paramref name="reverses"/> reverses live while the panel is open (no undo entry yet).</summary>
+        private void previewSliderReverses(int reverses)
+        {
+            if (reverseOriginal is not { } orig)
+                return;
+
+            int idx = parsed.HitObjects.FindIndex(o => o.Id == orig.Id);
+            if (idx < 0)
+                return;
+
+            double spanDuration = orig.Duration / Math.Max(1, orig.Slides);
+            if (spanDuration <= 0)
+                return;
+
+            int newSlides = Math.Max(1, reverses + 1);
+            if (parsed.HitObjects[idx].Slides == newSlides)
+                return;
+
+            parsed.HitObjects[idx] = orig with
+            {
+                Slides = newSlides,
+                Duration = spanDuration * newSlides,
+                RawLine = HitObjectLineEditor.SetSliderSlides(orig.RawLine, newSlides),
+            };
+            reverseChanged = newSlides != orig.Slides;
+
+            rebuildHitObjects();
+            topTimeline.Rebuild();
+        }
+
+        /// <summary>The panel closed without Apply: put the slider back exactly as it was.</summary>
+        private void cancelSliderReversesPreview()
+        {
+            if (reverseOriginal is { } orig)
+            {
+                int idx = parsed.HitObjects.FindIndex(o => o.Id == orig.Id);
+                if (idx >= 0 && reverseChanged)
+                {
+                    parsed.HitObjects[idx] = orig;
+                    rebuildHitObjects();
+                    topTimeline.Rebuild();
+                }
+            }
+
+            reverseOriginal = null;
+            reverseSnapshot = null;
+            reverseChanged = false;
         }
 
         private HitObjectModel? selectedSingleSlider()
@@ -4259,36 +4315,26 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             return null;
         }
 
-        /// <summary>Gives the selected slider exactly <paramref name="reverses"/> reverses (slides = reverses + 1), keeping its length and speed.</summary>
+        /// <summary>Applies the previewed reverse count: one undo step back to how the slider was before the panel opened.</summary>
         private void applySliderReverses(int reverses)
         {
-            var slider = selectedSingleSlider();
-            if (slider == null)
+            if (reverseOriginal is not { } orig)
                 return;
 
-            var orig = slider.Value;
-            int newSlides = Math.Max(1, reverses + 1);
-            if (orig.Slides == newSlides)
-                return;
+            // Make sure the final value is what's shown (a typed value commits on Apply without a preview tick).
+            previewSliderReverses(reverses);
 
-            double spanDuration = orig.Duration / Math.Max(1, orig.Slides);
-            if (spanDuration <= 0)
-                return;
-
-            int idx = parsed.HitObjects.FindIndex(o => o.Id == orig.Id);
-            if (idx < 0)
-                return;
-
-            pushUndo();
-            parsed.HitObjects[idx] = orig with
+            if (reverseChanged && reverseSnapshot != null)
             {
-                Slides = newSlides,
-                Duration = spanDuration * newSlides,
-                RawLine = HitObjectLineEditor.SetSliderSlides(orig.RawLine, newSlides),
-            };
+                undoStack.Push(reverseSnapshot);
+                redoStack.Clear();
+                afterEdit();
+                selection.SetSingle(orig.Id);
+            }
 
-            afterEdit();
-            selection.SetSingle(orig.Id);
+            reverseOriginal = null;
+            reverseSnapshot = null;
+            reverseChanged = false;
         }
 
         /// <summary>The on-screen Stream button: like the shortcut, but says why nothing happened.</summary>
