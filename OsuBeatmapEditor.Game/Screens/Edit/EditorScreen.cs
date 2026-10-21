@@ -333,6 +333,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         private CollabOverlay collabOverlay = null!;
         private UI.SliderToStreamOverlay sliderToStreamOverlay = null!;
+        private UI.SliderReverseOverlay sliderReverseOverlay = null!;
         private UI.PatternGalleryOverlay patternGallery = null!;
         private SavePatternButton savePatternButton = null!;
 
@@ -695,6 +696,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Origin = Anchor.TopRight,
                                 Margin = new MarginPadding { Right = 188, Top = 140 },
                             },
+                            new UI.LabelBarButton("Reverse", "Set how many reverses the selected slider has", openReverseOverlay, new Vector2(73))
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.TopRight,
+                                Margin = new MarginPadding { Right = 188, Top = 217 },
+                                AccentBorder = true,
+                            },
                             new UI.LabelBarButton("+SV", "Add an SV (green) timing point at the playhead", () => AddTimingPointAt(CurrentTime, uninherited: false), new Vector2(79, 49))
                             {
                                 AccentBorder = true,
@@ -1006,6 +1014,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Confirmed = confirmStreamPreview,
                     Cancelled = cancelStreamPreview,
                 },
+                sliderReverseOverlay = new UI.SliderReverseOverlay { Confirmed = applySliderReverses },
                 patternGallery = new UI.PatternGalleryOverlay
                 {
                     AddToMap = d => pasteObjects(d.Objects, d.SourceVelocities, d.SourceBeatLength),
@@ -4222,6 +4231,64 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             DeleteSelected();
+        }
+
+        /// <summary>The on-screen Reverse button: opens the reverse-count panel for the selected slider.</summary>
+        private void openReverseOverlay()
+        {
+            var slider = selectedSingleSlider();
+            if (slider == null)
+            {
+                toasts?.Push("Select a slider first", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            sliderReverseOverlay.Show(Math.Max(0, slider.Value.Slides - 1));
+        }
+
+        private HitObjectModel? selectedSingleSlider()
+        {
+            if (selection.Selected.Count != 1)
+                return null;
+
+            int id = selection.Selected.First();
+            foreach (var o in parsed.HitObjects)
+                if (o.Id == id && o.Kind == HitObjectKind.Slider)
+                    return o;
+
+            return null;
+        }
+
+        /// <summary>Gives the selected slider exactly <paramref name="reverses"/> reverses (slides = reverses + 1), keeping its length and speed.</summary>
+        private void applySliderReverses(int reverses)
+        {
+            var slider = selectedSingleSlider();
+            if (slider == null)
+                return;
+
+            var orig = slider.Value;
+            int newSlides = Math.Max(1, reverses + 1);
+            if (orig.Slides == newSlides)
+                return;
+
+            double spanDuration = orig.Duration / Math.Max(1, orig.Slides);
+            if (spanDuration <= 0)
+                return;
+
+            int idx = parsed.HitObjects.FindIndex(o => o.Id == orig.Id);
+            if (idx < 0)
+                return;
+
+            pushUndo();
+            parsed.HitObjects[idx] = orig with
+            {
+                Slides = newSlides,
+                Duration = spanDuration * newSlides,
+                RawLine = HitObjectLineEditor.SetSliderSlides(orig.RawLine, newSlides),
+            };
+
+            afterEdit();
+            selection.SetSingle(orig.Id);
         }
 
         /// <summary>The on-screen Stream button: like the shortcut, but says why nothing happened.</summary>
