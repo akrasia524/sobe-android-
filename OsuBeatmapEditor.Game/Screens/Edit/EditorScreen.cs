@@ -339,6 +339,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private UI.SliderToStreamOverlay sliderToStreamOverlay = null!;
         private UI.SliderReverseOverlay sliderReverseOverlay = null!;
         private UI.SelectionRotateOverlay selectionRotateOverlay = null!;
+        private UI.SelectionScaleOverlay selectionScaleOverlay = null!;
         private UI.PatternGalleryOverlay patternGallery = null!;
         private SavePatternButton savePatternButton = null!;
 
@@ -723,6 +724,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Highlight = () => HitObjectClipboard.PendingPaste && HitObjectClipboard.HasContent,
                                 HighlightColour = new osuTK.Graphics.Color4(0x30, 0x82, 0xfc, 0xff),
                             },
+                            new IconBarButton(FontAwesome.Solid.ExpandArrowsAlt, "Scale the selected object(s)", openSelectionScale)
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.Centre,
+                                Position = new Vector2(-302, 402),
+                                Size = new Vector2(63),
+                                IconSize = 28,
+                                AccentBorder = true,
+                                Round = true,
+                            },
                             new UI.LabelBarButton("Reverse", "Set how many reverses the selected slider has", openReverseOverlay, new Vector2(73))
                             {
                                 Anchor = Anchor.TopRight,
@@ -1041,6 +1052,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Confirmed = confirmStreamPreview,
                     Cancelled = cancelStreamPreview,
                 },
+                selectionScaleOverlay = new UI.SelectionScaleOverlay { Preview = previewSelectionScale, Confirmed = applySelectionScale, Cancelled = cancelSelectionScale },
                 selectionRotateOverlay = new UI.SelectionRotateOverlay { Preview = previewSelectionRotate, Confirmed = applySelectionRotate, Cancelled = cancelSelectionRotate },
                 sliderReverseOverlay = new UI.SliderReverseOverlay { Preview = previewSliderReverses, Confirmed = applySliderReverses, Cancelled = cancelSliderReversesPreview },
                 patternGallery = new UI.PatternGalleryOverlay
@@ -4270,6 +4282,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (rotationAnimating)
                 finishRotationAnimation();
 
+            selectionScaleOverlay.Hide();
+            selectionRotateOverlay.Hide();
+
             if (!prepareTransform())
             {
                 toasts?.Push("Select some objects first", EditorTheme.Colours.Warning);
@@ -4345,6 +4360,86 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             restoreSelectionRotateOriginals();
             selectionRotateActive = false;
+            transformSnapshot = null;
+            transformUndo = null;
+            transformChanged = false;
+        }
+
+        // --- Phone scale panel (live preview, like lazer's scale popover) ---
+        private bool selectionScaleActive;
+        private bool selectionScaleChanged;
+
+        private void openSelectionScale()
+        {
+            if (rotationAnimating)
+                finishRotationAnimation();
+
+            // Only one transform panel at a time (closing the rotate panel undoes its preview).
+            selectionRotateOverlay.Hide();
+            selectionScaleOverlay.Hide();
+
+            if (!prepareTransform())
+            {
+                toasts?.Push("Select some objects first", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            transformUndo = takeSnapshot();
+            transformChanged = false;
+            selectionScaleActive = true;
+            selectionScaleChanged = false;
+            selectionScaleOverlay.ShowFresh();
+        }
+
+        private void previewSelectionScale(float factor, int axis, bool aroundPlayfieldCentre)
+        {
+            if (!selectionScaleActive || transformSnapshot == null)
+                return;
+
+            Vector2 centre = aroundPlayfieldCentre
+                ? new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH / 2f, ParsedBeatmap.PLAYFIELD_HEIGHT / 2f)
+                : transformQuad.Centre;
+            float sx = axis == 2 ? 1f : factor;
+            float sy = axis == 1 ? 1f : factor;
+            Func<Vector2, Vector2> map = p => new Vector2(centre.X + (p.X - centre.X) * sx, centre.Y + (p.Y - centre.Y) * sy);
+
+            // Refuse a scale that would push objects off the playfield (same rule as rotate / the corner handles).
+            if (!transformStaysInBounds(map))
+            {
+                playfield.FlashSelectionBlocked();
+                return;
+            }
+
+            selectionScaleChanged = Math.Abs(factor - 1f) > 1e-4f;
+            applySelectionMap(map);
+        }
+
+        private void applySelectionScale(float factor, int axis, bool aroundPlayfieldCentre)
+        {
+            if (!selectionScaleActive)
+                return;
+
+            if (transformChanged && selectionScaleChanged && transformUndo != null)
+            {
+                undoStack.Push(transformUndo);
+                redoStack.Clear();
+                afterEdit();
+            }
+            else
+                restoreSelectionRotateOriginals();
+
+            selectionScaleActive = false;
+            transformSnapshot = null;
+            transformUndo = null;
+        }
+
+        private void cancelSelectionScale()
+        {
+            if (!selectionScaleActive)
+                return;
+
+            restoreSelectionRotateOriginals();
+            selectionScaleActive = false;
             transformSnapshot = null;
             transformUndo = null;
             transformChanged = false;
