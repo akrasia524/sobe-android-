@@ -338,6 +338,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private CollabOverlay collabOverlay = null!;
         private UI.SliderToStreamOverlay sliderToStreamOverlay = null!;
         private UI.SliderReverseOverlay sliderReverseOverlay = null!;
+        private UI.SelectionRotateOverlay selectionRotateOverlay = null!;
         private UI.PatternGalleryOverlay patternGallery = null!;
         private SavePatternButton savePatternButton = null!;
 
@@ -700,6 +701,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Origin = Anchor.TopRight,
                                 Margin = new MarginPadding { Right = 188, Top = 140 },
                             },
+                            new IconBarButton(FontAwesome.Solid.Sync, "Rotate the selected object(s)", openSelectionRotate)
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.Centre,
+                                Position = new Vector2(-302, 329),
+                                Size = new Vector2(63),
+                                IconSize = 28,
+                                AccentBorder = true,
+                                Round = true,
+                            },
                             new UI.LabelBarButton("Reverse", "Set how many reverses the selected slider has", openReverseOverlay, new Vector2(73))
                             {
                                 Anchor = Anchor.TopRight,
@@ -1018,6 +1029,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Confirmed = confirmStreamPreview,
                     Cancelled = cancelStreamPreview,
                 },
+                selectionRotateOverlay = new UI.SelectionRotateOverlay { Preview = previewSelectionRotate, Confirmed = applySelectionRotate, Cancelled = cancelSelectionRotate },
                 sliderReverseOverlay = new UI.SliderReverseOverlay { Preview = previewSliderReverses, Confirmed = applySliderReverses, Cancelled = cancelSliderReversesPreview },
                 patternGallery = new UI.PatternGalleryOverlay
                 {
@@ -4235,6 +4247,95 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             DeleteSelected();
+        }
+
+        // --- Phone rotate panel (live preview, like lazer's rotate popover) ---
+        private bool selectionRotateActive;
+        private float selectionRotateAngle;
+
+        private void openSelectionRotate()
+        {
+            if (rotationAnimating)
+                finishRotationAnimation();
+
+            if (!prepareTransform())
+            {
+                toasts?.Push("Select some objects first", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            transformUndo = takeSnapshot();
+            transformChanged = false;
+            selectionRotateActive = true;
+            selectionRotateAngle = 0;
+            selectionRotateOverlay.ShowFresh();
+        }
+
+        private void previewSelectionRotate(float degrees, bool aroundPlayfieldCentre)
+        {
+            if (!selectionRotateActive || transformSnapshot == null)
+                return;
+
+            Vector2 centre = aroundPlayfieldCentre
+                ? new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH / 2f, ParsedBeatmap.PLAYFIELD_HEIGHT / 2f)
+                : transformQuad.Centre;
+            Func<Vector2, Vector2> map = p => rotateAround(p, centre, degrees);
+
+            // Same rule as the other rotations: refuse an angle that would push objects off the playfield.
+            if (!transformStaysInBounds(map))
+            {
+                playfield.FlashSelectionBlocked();
+                return;
+            }
+
+            selectionRotateAngle = degrees;
+            applySelectionMap(map);
+        }
+
+        private void restoreSelectionRotateOriginals()
+        {
+            if (transformSnapshot != null && transformChanged)
+            {
+                for (int i = 0; i < parsed.HitObjects.Count; i++)
+                {
+                    if (transformSnapshot.TryGetValue(parsed.HitObjects[i].Id, out var orig))
+                        parsed.HitObjects[i] = orig;
+                }
+
+                rebuildHitObjects();
+            }
+        }
+
+        private void applySelectionRotate(float degrees, bool aroundPlayfieldCentre)
+        {
+            if (!selectionRotateActive)
+                return;
+
+            // The panel previews every change, so the objects are already at the last accepted angle.
+            if (transformChanged && selectionRotateAngle != 0 && transformUndo != null)
+            {
+                undoStack.Push(transformUndo);
+                redoStack.Clear();
+                afterEdit();
+            }
+            else
+                restoreSelectionRotateOriginals();
+
+            selectionRotateActive = false;
+            transformSnapshot = null;
+            transformUndo = null;
+        }
+
+        private void cancelSelectionRotate()
+        {
+            if (!selectionRotateActive)
+                return;
+
+            restoreSelectionRotateOriginals();
+            selectionRotateActive = false;
+            transformSnapshot = null;
+            transformUndo = null;
+            transformChanged = false;
         }
 
         /// <summary>The on-screen Reverse button: opens the reverse-count panel for the selected slider.</summary>

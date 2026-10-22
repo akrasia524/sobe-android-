@@ -249,9 +249,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         }
 
         /// <summary>A two-option segmented selector; the chosen option fills with the accent colour.</summary>
-        private partial class SegmentedToggle : CompositeDrawable
+        internal partial class SegmentedToggle : CompositeDrawable
         {
             public int SelectedIndex { get; private set; }
+
+            /// <summary>Option selected when first shown (default 0).</summary>
+            public int InitialIndex { get; init; }
+
+            /// <summary>Fired when the user taps an option.</summary>
+            public Action<int>? Changed;
 
             private readonly Segment[] segments;
 
@@ -270,7 +276,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 for (int i = 0; i < options.Length; i++)
                 {
                     int index = i;
-                    var seg = new Segment(options[i], () => select(index))
+                    var seg = new Segment(options[i], () => { select(index); Changed?.Invoke(index); })
                     {
                         RelativeSizeAxes = Axes.Both,
                         // Equal fractional widths summing to 1 (no flow spacing); the gap comes from each
@@ -287,7 +293,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             protected override void LoadComplete()
             {
                 base.LoadComplete();
-                select(0);
+                select(InitialIndex);
             }
 
             private void select(int index)

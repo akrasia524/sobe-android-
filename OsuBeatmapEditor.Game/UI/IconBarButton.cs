@@ -23,6 +23,9 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Overrides the outline colour used when <see cref="AccentBorder"/> is on.</summary>
         public osuTK.Graphics.Color4? BorderOverride { get; init; }
 
+        /// <summary>Draws the button as a circle instead of a rounded square.</summary>
+        public bool Round { get; init; }
+
         private readonly IconUsage icon;
         private readonly string tooltip;
         private Box background = null!;
@@ -55,7 +58,7 @@ namespace OsuBeatmapEditor.Game.UI
                 Masking = true,
                 BorderThickness = AccentBorder ? 3 : 0,
                 BorderColour = BorderOverride ?? EditorTheme.Colours.Accent,
-                CornerRadius = 5,
+                CornerRadius = Round ? Size.X / 2 : 5,
                 Children = new Drawable[]
                 {
                     background = new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Control },
