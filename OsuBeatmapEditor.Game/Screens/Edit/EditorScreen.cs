@@ -338,6 +338,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private CollabOverlay collabOverlay = null!;
         private UI.SliderToStreamOverlay sliderToStreamOverlay = null!;
         private UI.SliderReverseOverlay sliderReverseOverlay = null!;
+        private readonly BindableBool mirrorMode = new BindableBool(true);
         private UI.SelectionRotateOverlay selectionRotateOverlay = null!;
         private UI.SelectionScaleOverlay selectionScaleOverlay = null!;
         private UI.PatternGalleryOverlay patternGallery = null!;
@@ -734,7 +735,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 AccentBorder = true,
                                 Round = true,
                             },
-                            new IconBarButton(FontAwesome.Solid.ArrowsAltV, "Flip the selection vertically (top to bottom)", () => flipFromButton(false))
+                            new IconBarButton(FontAwesome.Solid.ArrowsAltV, "Flip/mirror the selection vertically (top to bottom) - see the Mirror/Flip button", () => flipFromButton(false))
                             {
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.Centre,
@@ -744,7 +745,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 AccentBorder = true,
                                 Round = true,
                             },
-                            new IconBarButton(FontAwesome.Solid.ArrowsAltH, "Flip the selection horizontally (left to right)", () => flipFromButton(true))
+                            new IconBarButton(FontAwesome.Solid.ArrowsAltH, "Flip/mirror the selection horizontally (left to right) - see the Mirror/Flip button", () => flipFromButton(true))
                             {
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.Centre,
@@ -753,6 +754,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 IconSize = 28,
                                 AccentBorder = true,
                                 Round = true,
+                            },
+                            new UI.MirrorModeButton(mirrorMode)
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.Centre,
+                                Position = new Vector2(-225, 329),
+                                Size = new Vector2(63),
                             },
                             new UI.LabelBarButton("Reverse", "Set how many reverses the selected slider has", openReverseOverlay, new Vector2(73))
                             {
@@ -4397,7 +4405,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return;
             }
 
-            FlipSelection(horizontal);
+            FlipSelection(horizontal, mirrorMode.Value);
         }
 
         // --- Phone scale panel (live preview, like lazer's scale popover) ---
@@ -5695,12 +5703,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             transformUndo = null;
         }
 
-        public void FlipSelection(bool horizontal)
+        public void FlipSelection(bool horizontal, bool overPlayfieldCentre = false)
         {
             if (!prepareTransform())
                 return;
 
-            Vector2 centre = transformQuad.Centre;
+            Vector2 centre = overPlayfieldCentre
+                ? new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH / 2f, ParsedBeatmap.PLAYFIELD_HEIGHT / 2f)
+                : transformQuad.Centre;
             transformUndo = takeSnapshot();
             transformChanged = false;
 
