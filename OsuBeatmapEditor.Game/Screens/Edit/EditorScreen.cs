@@ -711,6 +711,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 AccentBorder = true,
                                 Round = true,
                             },
+                            new IconBarButton(FontAwesome.Solid.Clipboard, "Copy the selection, then tap again to paste it at the playhead", clipboardButtonPressed)
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.Centre,
+                                Position = new Vector2(-226, 402),
+                                Size = new Vector2(63),
+                                IconSize = 28,
+                                AccentBorder = true,
+                                Round = true,
+                                Highlight = () => HitObjectClipboard.PendingPaste && HitObjectClipboard.HasContent,
+                                HighlightColour = new osuTK.Graphics.Color4(0x30, 0x82, 0xfc, 0xff),
+                            },
                             new UI.LabelBarButton("Reverse", "Set how many reverses the selected slider has", openReverseOverlay, new Vector2(73))
                             {
                                 Anchor = Anchor.TopRight,
@@ -6138,6 +6150,26 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return;
 
             pasteObjects(HitObjectClipboard.Objects);
+            HitObjectClipboard.PendingPaste = false;
+        }
+
+        /// <summary>The phone clipboard button: copies the selection, or (once something is copied) pastes it at the playhead.</summary>
+        private void clipboardButtonPressed()
+        {
+            if (HitObjectClipboard.PendingPaste && HitObjectClipboard.HasContent)
+            {
+                paste();
+                return;
+            }
+
+            if (selection.Selected.Count == 0)
+            {
+                toasts?.Push("Select objects to copy first", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            copySelection();
+            toasts?.Push("Copied - tap again to paste at the playhead", EditorTheme.Colours.Accent);
         }
 
         /// <summary>

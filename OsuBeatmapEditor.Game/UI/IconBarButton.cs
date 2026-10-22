@@ -26,6 +26,13 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Draws the button as a circle instead of a rounded square.</summary>
         public bool Round { get; init; }
 
+        /// <summary>While this returns true the icon and border are drawn in <see cref="HighlightColour"/> (e.g. 'ready to paste').</summary>
+        public Func<bool>? Highlight { get; init; }
+
+        public osuTK.Graphics.Color4 HighlightColour { get; init; } = osuTK.Graphics.Color4.White;
+
+        private bool highlighted;
+
         private readonly IconUsage icon;
         private readonly string tooltip;
         private Box background = null!;
@@ -74,10 +81,26 @@ namespace OsuBeatmapEditor.Game.UI
             };
         }
 
+        protected override void Update()
+        {
+            base.Update();
+
+            if (Highlight == null)
+                return;
+
+            bool on = Highlight();
+            if (on == highlighted)
+                return;
+
+            highlighted = on;
+            content.BorderColour = on ? HighlightColour : (BorderOverride ?? EditorTheme.Colours.Accent);
+            iconSprite.Colour = on ? HighlightColour : (IsHovered ? EditorTheme.Colours.Text : EditorTheme.Colours.TextMuted);
+        }
+
         protected override bool OnHover(HoverEvent e)
         {
             background.FadeColour(EditorTheme.Colours.ControlHover, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
-            iconSprite.FadeColour(EditorTheme.Colours.Text, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
+            if (!highlighted) iconSprite.FadeColour(EditorTheme.Colours.Text, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             content.ScaleTo(1.1f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
             return true;
         }
@@ -85,7 +108,7 @@ namespace OsuBeatmapEditor.Game.UI
         protected override void OnHoverLost(HoverLostEvent e)
         {
             background.FadeColour(EditorTheme.Colours.Control, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
-            iconSprite.FadeColour(EditorTheme.Colours.TextMuted, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
+            if (!highlighted) iconSprite.FadeColour(EditorTheme.Colours.TextMuted, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             content.ScaleTo(1f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
         }
 

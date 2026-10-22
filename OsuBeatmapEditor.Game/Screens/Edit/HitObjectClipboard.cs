@@ -16,6 +16,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         public static bool HasContent => objects.Count > 0;
 
+        /// <summary>True from a copy until the next paste (drives the phone clipboard button's blue "ready to paste" look).</summary>
+        public static bool PendingPaste { get; set; }
+
         /// <summary>The copied objects, in start-time order.</summary>
         public static IReadOnlyList<HitObjectModel> Objects => objects;
 
@@ -24,6 +27,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             objects.Clear();
             objects.AddRange(source.OrderBy(o => o.StartTime));
+            PendingPaste = objects.Count > 0;
         }
     }
 }
