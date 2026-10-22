@@ -241,8 +241,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
-                // Phones: K1/K2 sit in the column lined up with the cyan guide line (centred on it), below the Reverse button.
-                Margin = UI.MobileMetrics.IsMobile ? new MarginPadding { Right = 280, Top = 200 } : new MarginPadding { Right = 12 },
+                // Phones: K1/K2 sit left of the trash button (the cyan squares in the user's mock-up), K1 on top.
+                Margin = UI.MobileMetrics.IsMobile ? new MarginPadding { Right = 298, Top = 362 } : new MarginPadding { Right = 12 },
                 Alpha = 0,
             },
             playArea = new Container

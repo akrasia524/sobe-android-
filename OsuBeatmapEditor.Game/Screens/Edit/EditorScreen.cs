@@ -688,7 +688,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                             {
                                 Anchor = Anchor.BottomRight,
                                 Origin = Anchor.BottomRight,
-                                Margin = new MarginPadding { Right = 231, Bottom = 54 },
+                                Margin = new MarginPadding { Right = 219, Bottom = 54 },
                                 Size = new Vector2(73),
                                 IconSize = 30,
                                 AccentBorder = true,
