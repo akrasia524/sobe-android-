@@ -297,7 +297,7 @@ namespace OsuBeatmapEditor.Game.UI
         private static Container sliderRow(Drawable slider) => new Container
         {
             RelativeSizeAxes = Axes.X,
-            Height = 12,
+            Height = 32,
             Child = slider,
         };
 
