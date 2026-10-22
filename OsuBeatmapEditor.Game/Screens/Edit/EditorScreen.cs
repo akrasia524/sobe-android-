@@ -4405,7 +4405,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return;
             }
 
-            FlipSelection(horizontal, mirrorMode.Value);
+            flipSelection(horizontal, mirrorMode.Value);
         }
 
         // --- Phone scale panel (live preview, like lazer's scale popover) ---
@@ -5703,7 +5703,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             transformUndo = null;
         }
 
-        public void FlipSelection(bool horizontal, bool overPlayfieldCentre = false)
+        public void FlipSelection(bool horizontal) => flipSelection(horizontal, false);
+
+        private void flipSelection(bool horizontal, bool overPlayfieldCentre)
         {
             if (!prepareTransform())
                 return;
