@@ -734,6 +734,26 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 AccentBorder = true,
                                 Round = true,
                             },
+                            new IconBarButton(FontAwesome.Solid.ArrowsAltV, "Flip the selection vertically (top to bottom)", () => flipFromButton(false))
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.Centre,
+                                Position = new Vector2(-302, 186),
+                                Size = new Vector2(63),
+                                IconSize = 28,
+                                AccentBorder = true,
+                                Round = true,
+                            },
+                            new IconBarButton(FontAwesome.Solid.ArrowsAltH, "Flip the selection horizontally (left to right)", () => flipFromButton(true))
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.Centre,
+                                Position = new Vector2(-302, 258),
+                                Size = new Vector2(63),
+                                IconSize = 28,
+                                AccentBorder = true,
+                                Round = true,
+                            },
                             new UI.LabelBarButton("Reverse", "Set how many reverses the selected slider has", openReverseOverlay, new Vector2(73))
                             {
                                 Anchor = Anchor.TopRight,
@@ -4363,6 +4383,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             transformSnapshot = null;
             transformUndo = null;
             transformChanged = false;
+        }
+
+        /// <summary>The phone flip buttons: mirror the selection (one undo step), after closing any open transform panel.</summary>
+        private void flipFromButton(bool horizontal)
+        {
+            selectionRotateOverlay.Hide();
+            selectionScaleOverlay.Hide();
+
+            if (selection.Selected.Count == 0)
+            {
+                toasts?.Push("Select some objects first", EditorTheme.Colours.Warning);
+                return;
+            }
+
+            FlipSelection(horizontal);
         }
 
         // --- Phone scale panel (live preview, like lazer's scale popover) ---
