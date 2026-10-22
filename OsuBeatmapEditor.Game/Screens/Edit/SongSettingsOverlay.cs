@@ -6,6 +6,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using OsuBeatmapEditor.Game.Graphics;
+using OsuBeatmapEditor.Game.UI;
 using osuTK;
 
 namespace OsuBeatmapEditor.Game.Screens.Edit
@@ -116,15 +117,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     {
                         RelativeSizeAxes = Axes.Both,
                         Padding = new MarginPadding { Left = 120, Right = 64 },
-                        Child = new BasicSliderBar<float>
+                        Child = new KnobSliderBar<float>
                         {
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                            RelativeSizeAxes = Axes.X,
-                            Height = 8,
+                            RelativeSizeAxes = Axes.Both,
                             Current = bindable,
-                            BackgroundColour = EditorTheme.Colours.Sunken,
-                            SelectionColour = EditorTheme.Colours.Accent,
                         },
                     },
                 },

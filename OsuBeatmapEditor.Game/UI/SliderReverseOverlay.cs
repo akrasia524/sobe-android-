@@ -125,13 +125,11 @@ namespace OsuBeatmapEditor.Game.UI
                                     new Container
                                     {
                                         RelativeSizeAxes = Axes.X,
-                                        Height = 12,
-                                        Child = new BasicSliderBar<int>
+                                        Height = 32,
+                                        Child = new KnobSliderBar<int>
                                         {
                                             RelativeSizeAxes = Axes.Both,
                                             Current = reversesBar,
-                                            BackgroundColour = EditorTheme.Colours.Sunken,
-                                            SelectionColour = EditorTheme.Colours.Selection,
                                         },
                                     },
                                     new SpriteText

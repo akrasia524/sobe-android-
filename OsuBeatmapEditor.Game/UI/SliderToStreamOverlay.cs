@@ -144,12 +144,10 @@ namespace OsuBeatmapEditor.Game.UI
                                             },
                                         },
                                     },
-                                    sliderRow(new BasicSliderBar<int>
+                                    sliderRow(new KnobSliderBar<int>
                                     {
                                         RelativeSizeAxes = Axes.Both,
                                         Current = countBar,
-                                        BackgroundColour = EditorTheme.Colours.Sunken,
-                                        SelectionColour = EditorTheme.Colours.Selection,
                                     }),
                                     new Container
                                     {
@@ -174,12 +172,10 @@ namespace OsuBeatmapEditor.Game.UI
                                             },
                                         },
                                     },
-                                    sliderRow(new BasicSliderBar<float>
+                                    sliderRow(new KnobSliderBar<float>
                                     {
                                         RelativeSizeAxes = Axes.Both,
                                         Current = curveBar,
-                                        BackgroundColour = EditorTheme.Colours.Sunken,
-                                        SelectionColour = EditorTheme.Colours.Selection,
                                     }),
                                     curveCaption = new SpriteText
                                     {
