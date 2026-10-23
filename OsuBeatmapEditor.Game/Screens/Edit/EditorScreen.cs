@@ -341,6 +341,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private readonly BindableBool mirrorMode = new BindableBool(true);
         private UI.SelectionRotateOverlay selectionRotateOverlay = null!;
         private UI.SelectionScaleOverlay selectionScaleOverlay = null!;
+        private UI.PolygonOverlay polygonOverlay = null!;
         private UI.PatternGalleryOverlay patternGallery = null!;
         private SavePatternButton savePatternButton = null!;
 
@@ -762,6 +763,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Position = new Vector2(-225, 329),
                                 Size = new Vector2(63),
                             },
+                            new UI.PolygonToolButton(openPolygon)
+                            {
+                                Anchor = Anchor.TopRight,
+                                Origin = Anchor.TopRight,
+                                Margin = new MarginPadding { Right = 84, Top = 254 },
+                                Size = new Vector2(73),
+                            },
                             new UI.LabelBarButton("Reverse", "Set how many reverses the selected slider has", openReverseOverlay, new Vector2(73))
                             {
                                 Anchor = Anchor.TopRight,
@@ -1080,6 +1088,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Confirmed = confirmStreamPreview,
                     Cancelled = cancelStreamPreview,
                 },
+                polygonOverlay = new UI.PolygonOverlay { Preview = previewPolygon, Confirmed = createPolygon, Cancelled = cancelPolygon },
                 selectionScaleOverlay = new UI.SelectionScaleOverlay { Preview = previewSelectionScale, Confirmed = applySelectionScale, Cancelled = cancelSelectionScale },
                 selectionRotateOverlay = new UI.SelectionRotateOverlay { Preview = previewSelectionRotate, Confirmed = applySelectionRotate, Cancelled = cancelSelectionRotate },
                 sliderReverseOverlay = new UI.SliderReverseOverlay { Preview = previewSliderReverses, Confirmed = applySliderReverses, Cancelled = cancelSliderReversesPreview },
@@ -4406,6 +4415,131 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             flipSelection(horizontal, mirrorMode.Value);
+        }
+
+        // --- Phone polygon generator: the same maths as osu!lazer's Generate > Polygon popover ---
+        private Snapshot? polygonSnapshot;
+        private readonly List<int> polygonIds = new List<int>();
+        private double polygonStart;
+
+        private void openPolygon()
+        {
+            selectionRotateOverlay.Hide();
+            selectionScaleOverlay.Hide();
+            sliderReverseOverlay.Hide();
+            polygonOverlay.Hide();
+
+            polygonSnapshot = takeSnapshot();
+            polygonIds.Clear();
+            polygonStart = Math.Round(snapTime(CurrentTime));
+            polygonOverlay.ShowFresh(distanceSpacing);
+        }
+
+        private void removePolygonPreview()
+        {
+            if (polygonIds.Count == 0)
+                return;
+
+            var ids = new HashSet<int>(polygonIds);
+            parsed.HitObjects.RemoveAll(o => ids.Contains(o.Id));
+            polygonIds.Clear();
+        }
+
+        /// <summary>
+        /// Shows the polygon live. Exactly lazer's maths: edge length = distance snap x pixel velocity x one beat-divisor
+        /// step; circumradius = length / (2 sin(pi / vertices)); circle i sits at angle offset + (i + 1) * 2pi / vertices
+        /// around the playfield centre, one beat-divisor step after the previous one. If any circle would leave the
+        /// playfield nothing is shown and Create is blocked.
+        /// </summary>
+        private bool previewPolygon(double distance, int offsetDegrees, int repeats, int vertices)
+        {
+            if (polygonSnapshot == null)
+                return true;
+
+            removePolygonPreview();
+
+            double start = polygonStart;
+            if (!tryActiveBeat(start, out _, out double step))
+            {
+                recomputeCombos();
+                rebuildHitObjects();
+                topTimeline.Rebuild();
+                return true;
+            }
+
+            double length = distance * pixelVelocityAt(start) * step;
+            double radius = length / (2 * Math.Sin(Math.PI / vertices));
+            int total = vertices * repeats;
+
+            var circles = new List<HitObjectModel>(total);
+            double time = start;
+            int id = nextId();
+            bool inside = true;
+
+            for (int i = 0; i < total; i++)
+            {
+                double angle = offsetDegrees * Math.PI / 180.0 + (i + 1) * (2 * Math.PI / vertices);
+                double fx = ParsedBeatmap.PLAYFIELD_WIDTH / 2.0 + radius * Math.Cos(angle);
+                double fy = ParsedBeatmap.PLAYFIELD_HEIGHT / 2.0 + radius * Math.Sin(angle);
+
+                if (fx < 0 || fy < 0 || fx > ParsedBeatmap.PLAYFIELD_WIDTH || fy > ParsedBeatmap.PLAYFIELD_HEIGHT)
+                {
+                    inside = false;
+                    break;
+                }
+
+                int px = (int)Math.Round(fx);
+                int py = (int)Math.Round(fy);
+                int t = (int)Math.Round(time);
+                circles.Add(new HitObjectModel(px, py, t, HitObjectKind.Circle, null, RawLine: $"{px},{py},{t},1,0,0:0:0:0:", Id: id++));
+                time = snapTime(time + step);
+            }
+
+            if (inside)
+            {
+                foreach (var c in circles)
+                {
+                    parsed.HitObjects.Add(c);
+                    polygonIds.Add(c.Id);
+                }
+
+                parsed.HitObjects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
+            }
+
+            recomputeCombos();
+            rebuildHitObjects();
+            topTimeline.Rebuild();
+            return inside;
+        }
+
+        private void createPolygon()
+        {
+            if (polygonSnapshot == null || polygonIds.Count == 0)
+                return;
+
+            undoStack.Push(polygonSnapshot);
+            redoStack.Clear();
+            afterEdit();
+            selection.SetRange(new List<int>(polygonIds));
+            polygonSnapshot = null;
+            polygonIds.Clear();
+        }
+
+        private void cancelPolygon()
+        {
+            if (polygonSnapshot == null)
+                return;
+
+            bool had = polygonIds.Count > 0;
+            removePolygonPreview();
+            polygonSnapshot = null;
+
+            if (had)
+            {
+                recomputeCombos();
+                rebuildHitObjects();
+                topTimeline.Rebuild();
+            }
         }
 
         // --- Phone scale panel (live preview, like lazer's scale popover) ---
