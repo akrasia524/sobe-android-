@@ -60,6 +60,20 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             return $"audio{audioExtension}";
         }
 
+        /// <summary>The stored name of the optional background image (never clashes with the audio or .osu name), or null for none.</summary>
+        public static string? ResolveBackgroundFilename(NewBeatmapRequest request, string audioFilename)
+        {
+            if (string.IsNullOrWhiteSpace(request.BackgroundPath))
+                return null;
+
+            string name = sanitiseFilename(Path.GetFileName(request.BackgroundPath)).Replace('"', '_');
+            if (string.Equals(name, audioFilename, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, OsuFilename(request), StringComparison.OrdinalIgnoreCase))
+                name = "bg-" + name;
+
+            return name;
+        }
+
         /// <summary>The .osu filename for the request, "{Artist} - {Title} ({Creator}) [{Diff}].osu".</summary>
         public static string OsuFilename(NewBeatmapRequest request) =>
             sanitiseFilename($"{request.Artist} - {request.Title} ({request.Creator}) [{request.DifficultyName}].osu");
@@ -69,7 +83,7 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         /// uninherited (red/BPM) timing points are kept - inherited (green/SV/kiai) points are dropped. No
         /// bookmarks are ever written. Shared by the .osz exporter and the direct realm creator.
         /// </summary>
-        public static string BuildOsuText(NewBeatmapRequest request, string audioFilename, bool uninheritedTimingOnly)
+        public static string BuildOsuText(NewBeatmapRequest request, string audioFilename, bool uninheritedTimingOnly, string? backgroundFilename = null)
         {
             // Beat length in milliseconds for the uninherited (red) timing point.
             double beatLength = 60000.0 / request.Bpm;
@@ -117,6 +131,8 @@ namespace OsuBeatmapEditor.Game.Beatmaps
 
             sb.Append("[Events]\n");
             sb.Append("//Background and Video events\n");
+            if (!string.IsNullOrEmpty(backgroundFilename))
+                sb.Append($"0,0,\"{backgroundFilename}\",0,0\n");
             sb.Append("//Break Periods\n");
             sb.Append("//Storyboard Layer 0 (Background)\n");
             sb.Append("//Storyboard Layer 1 (Fail)\n");

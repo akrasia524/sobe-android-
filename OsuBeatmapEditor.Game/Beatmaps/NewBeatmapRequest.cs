@@ -30,6 +30,9 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         /// </summary>
         public IReadOnlyList<string>? TimingPointLines { get; set; }
 
+        /// <summary>Optional: a .jpg/.png to use as the map's background (null = no background).</summary>
+        public string? BackgroundPath { get; set; }
+
         /// <summary>Whether all required fields are present and valid.</summary>
         public bool IsValid =>
             !string.IsNullOrWhiteSpace(Title)

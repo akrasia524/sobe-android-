@@ -136,6 +136,50 @@ namespace OsuBeatmapEditor.Game.DataTests
         }
 
         [Test]
+        public void CreateWithABackgroundStoresTheImageAndPointsTheMapAtIt()
+        {
+            string staged = LibraryCreator.StageAudio(lib, audio()).Path!;
+            string img = Path.Combine(root, "cover.jpg");
+            File.WriteAllBytes(img, new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 1, 2, 3 });
+
+            var req = request(staged);
+            req.BackgroundPath = img;
+            var outcome = LibraryCreator.Create(store, req);
+
+            Assert.That(outcome.Success, Is.True, outcome.Message);
+            var set = store.Sets.Single();
+            Assert.That(File.ReadAllBytes(Path.Combine(store.FilesDirectory(set.Id), "cover.jpg")), Is.EqualTo(File.ReadAllBytes(img)));
+            var parsed = Fixtures.Decode(store.ReadFileText(set.Id, set.Difficulties[0].File));
+            Assert.That(parsed.BackgroundFilename, Is.EqualTo("cover.jpg"));
+        }
+
+        [Test]
+        public void CreateWithoutABackgroundStillWorksAndHasNone()
+        {
+            string staged = LibraryCreator.StageAudio(lib, audio()).Path!;
+
+            Assert.That(LibraryCreator.Create(store, request(staged)).Success, Is.True);
+            var set = store.Sets.Single();
+            Assert.That(Fixtures.Decode(store.ReadFileText(set.Id, set.Difficulties[0].File)).BackgroundFilename, Is.Empty);
+        }
+
+        [Test]
+        public void ABadBackgroundIsRefusedAndNothingIsCreated()
+        {
+            string staged = LibraryCreator.StageAudio(lib, audio()).Path!;
+            string img = Path.Combine(root, "notes.png");
+            File.WriteAllBytes(img, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+
+            var req = request(staged);
+            req.BackgroundPath = img;
+            var outcome = LibraryCreator.Create(store, req);
+
+            Assert.That(outcome.Success, Is.False);
+            Assert.That(outcome.Message, Does.Contain("Background"));
+            Assert.That(store.Sets, Is.Empty);
+        }
+
+        [Test]
         public void CreateSurvivesAReopenAndTwoIdenticalCreatesAreBothKept()
         {
             string a = audio();

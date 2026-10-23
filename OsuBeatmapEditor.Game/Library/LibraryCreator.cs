@@ -87,6 +87,14 @@ namespace OsuBeatmapEditor.Game.Library
             if (audioProblem != null)
                 return new ActionOutcome(false, audioProblem);
 
+            // The background is optional, but a chosen one must be a real image (checked before anything is built).
+            if (!string.IsNullOrWhiteSpace(request.BackgroundPath))
+            {
+                string? imageProblem = PickedImage.Validate(request.BackgroundPath);
+                if (imageProblem != null)
+                    return new ActionOutcome(false, "Background: " + imageProblem);
+            }
+
             string tempDir = Path.Combine(store.RootDirectory, temp_dir);
             string tempOsz = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + ".osz");
 
@@ -96,14 +104,18 @@ namespace OsuBeatmapEditor.Game.Library
 
                 string audioName = BeatmapArchiveWriter.ResolveAudioFilename(request);
                 string osuName = BeatmapArchiveWriter.OsuFilename(request);
+                string? backgroundName = BeatmapArchiveWriter.ResolveBackgroundFilename(request, audioName);
 
                 using (var archive = ZipFile.Open(tempOsz, ZipArchiveMode.Create))
                 {
                     var entry = archive.CreateEntry(osuName, CompressionLevel.NoCompression);
                     using (var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false)))
-                        writer.Write(BeatmapArchiveWriter.BuildOsuText(request, audioName, uninheritedTimingOnly: false));
+                        writer.Write(BeatmapArchiveWriter.BuildOsuText(request, audioName, uninheritedTimingOnly: false, backgroundName));
 
                     archive.CreateEntryFromFile(request.AudioPath, audioName, CompressionLevel.NoCompression);
+
+                    if (backgroundName != null)
+                        archive.CreateEntryFromFile(request.BackgroundPath!, backgroundName, CompressionLevel.NoCompression);
                 }
 
                 using (var fs = File.OpenRead(tempOsz))
