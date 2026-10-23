@@ -49,6 +49,12 @@ namespace OsuBeatmapEditor.Game.UI
         /// <summary>Copies a picked audio file into app storage; returns the new path or an error. Null = use the picked path as is.</summary>
         public Func<string, (string? Path, string? Error)>? StageAudio { get; set; }
 
+        // Optional background image (Android picker): a copy in the app cache, used only if the user chose one.
+        private string? backgroundPath;
+        private SpriteText backgroundChipText = null!;
+        private Box backgroundChipBackground = null!;
+        private OsuButton removeBackgroundButton = null!;
+
         private string? stagedAudio;
         private bool creating;
         private Box audioChipBackground = null!;
@@ -287,8 +293,135 @@ namespace OsuBeatmapEditor.Game.UI
                     Colour = EditorTheme.Colours.TextFaint,
                     Font = EditorTheme.Type.Caption(),
                 },
+                buildBackgroundSection(),
             },
         };
+
+        /// <summary>Optional background image: a chip showing the choice, a Choose button and a Remove button. Skipping it is fine.</summary>
+        private Drawable buildBackgroundSection() => new FillFlowContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            Direction = FillDirection.Vertical,
+            Spacing = new Vector2(0, EditorTheme.Spacing.Xs),
+            Margin = new MarginPadding { Top = EditorTheme.Spacing.Sm },
+            Children = new Drawable[]
+            {
+                new SpriteText
+                {
+                    Text = "Background image (optional)",
+                    Colour = EditorTheme.Colours.Text,
+                    Font = EditorTheme.Type.Heading(),
+                },
+                new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = EditorTheme.Sizing.RowHeight,
+                    Masking = true,
+                    CornerRadius = EditorTheme.Radius.Sm,
+                    Children = new Drawable[]
+                    {
+                        backgroundChipBackground = new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Control },
+                        backgroundChipText = new SpriteText
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Margin = new MarginPadding { Horizontal = EditorTheme.Spacing.Md },
+                            Text = "No background - you can add one later in Song Setup",
+                            Colour = EditorTheme.Colours.TextMuted,
+                            Font = EditorTheme.Type.BodyStrong(),
+                            Truncate = true,
+                            RelativeSizeAxes = Axes.X,
+                        },
+                    },
+                },
+                new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Horizontal,
+                    Spacing = new Vector2(EditorTheme.Spacing.Md, 0),
+                    Children = new Drawable[]
+                    {
+                        new OsuButton("Choose background image", OsuColour.Surface) { Size = new Vector2(250, 40), Action = onChooseBackground },
+                        removeBackgroundButton = new OsuButton("Remove", OsuColour.Surface) { Size = new Vector2(100, 40), Action = () => clearBackground(), Alpha = 0 },
+                    },
+                },
+            },
+        };
+
+        private void onChooseBackground()
+        {
+            var pick = PlatformPicker.PickImage;
+            if (pick == null || creating)
+                return;
+
+            pick(result => Schedule(() => onBackgroundPicked(result)));
+        }
+
+        private void onBackgroundPicked(PickResult result)
+        {
+            if (result.Cancelled)
+                return; // backed out: keep whatever was chosen before
+
+            if (result.Path == null)
+            {
+                showStatus(result.Error ?? "Could not open that file.", true);
+                return;
+            }
+
+            string? problem = PickedImage.Validate(result.Path);
+            if (problem != null)
+            {
+                tryDelete(result.Path);
+                showStatus(problem, true);
+                return;
+            }
+
+            if (!IsLoaded || State.Value == Visibility.Hidden)
+            {
+                tryDelete(result.Path); // the dialog was dismissed meanwhile: don't keep an orphaned copy
+                return;
+            }
+
+            discardBackground();
+            backgroundPath = result.Path;
+            backgroundChipText.Text = Path.GetFileName(result.Path);
+            backgroundChipText.Colour = EditorTheme.Colours.Text;
+            backgroundChipBackground.FadeColour(EditorTheme.Colours.AccentSoft, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+            removeBackgroundButton.Alpha = 1;
+            showStatus("Background selected: " + Path.GetFileName(result.Path), false);
+        }
+
+        /// <summary>Forgets the chosen background (and deletes its cached copy). The map is then created without one.</summary>
+        private void clearBackground()
+        {
+            discardBackground();
+            if (backgroundChipText == null)
+                return;
+
+            backgroundChipText.Text = "No background - you can add one later in Song Setup";
+            backgroundChipText.Colour = EditorTheme.Colours.TextMuted;
+            backgroundChipBackground.FadeColour(EditorTheme.Colours.Control, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
+            removeBackgroundButton.Alpha = 0;
+        }
+
+        private void discardBackground()
+        {
+            if (backgroundPath == null)
+                return;
+
+            tryDelete(backgroundPath);
+            try
+            {
+                string? dir = Path.GetDirectoryName(backgroundPath);
+                if (dir != null && Path.GetFileName(Path.GetDirectoryName(dir) ?? string.Empty) == "image-pick")
+                    Directory.Delete(dir, false);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+
+            backgroundPath = null;
+        }
 
         private void onChooseAudio()
         {
@@ -430,6 +563,7 @@ namespace OsuBeatmapEditor.Game.UI
 
                 showStatus("Beatmap created.", false);
                 clearStagedAudio();
+                clearBackground();
                 Created?.Invoke(request);
                 Scheduler.AddDelayed(Hide, 600);
             }));
@@ -451,6 +585,7 @@ namespace OsuBeatmapEditor.Game.UI
             seededTimingLines = null;
             autoArtist = autoTitle = null;
 
+            clearBackground();
             setAudioLabel("No audio selected");
             statusText.Text = string.Empty;
             validate();
@@ -555,6 +690,7 @@ namespace OsuBeatmapEditor.Game.UI
             AudioPath = audioPath ?? string.Empty,
             AudioFileName = seededAudioFileName,
             TimingPointLines = seededTimingLines,
+            BackgroundPath = backgroundPath,
         };
 
         /// <summary>Opens the dialog for a brand-new map (clears any seeded audio/timing from a prior "new set").</summary>
