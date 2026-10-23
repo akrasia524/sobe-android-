@@ -7572,7 +7572,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             if (set.IsLibrarySet)
             {
                 // App-owned library: patch the original text, check it, and replace the file with a rolling backup.
-                string? error = LibrarySaver.Save(set, difficulty, parsed, edits, pendingBackgroundPath != null);
+                string? error = LibrarySaver.Save(set, difficulty, parsed, edits, pendingBackgroundPath);
                 ok = error == null;
                 if (!ok)
                     toasts?.Push($"Save failed: {error}", EditorTheme.Colours.Error);

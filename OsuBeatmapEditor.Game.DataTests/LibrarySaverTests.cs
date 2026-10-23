@@ -101,6 +101,55 @@ namespace OsuBeatmapEditor.Game.DataTests
         }
 
         [Test]
+        public void ANewBackgroundIsStoredInTheSetAndTheMapPointsAtIt()
+        {
+            var (set, diff, parsed, edits) = open(Fixtures.Full);
+            string img = Path.Combine(root, "new cover.png");
+            File.WriteAllBytes(img, new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 9, 9 });
+
+            Assert.That(LibrarySaver.Save(set, diff, parsed, edits, img), Is.Null);
+
+            string saved = stored(set);
+            Assert.That(saved, Does.Contain("\"new cover.png\""));
+            Assert.That(File.ReadAllBytes(Path.Combine(store.FilesDirectory(set.LibrarySetId), "new cover.png")), Is.EqualTo(File.ReadAllBytes(img)));
+            Assert.That(Fixtures.Decode(saved).BackgroundFilename, Is.EqualTo("new cover.png"));
+            Assert.That(store.ListBackups(set.LibrarySetId, file_name), Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void ABadBackgroundWritesNothingAtAll()
+        {
+            var (set, diff, parsed, edits) = open(Fixtures.Full);
+            string img = Path.Combine(root, "fake.png");
+            File.WriteAllBytes(img, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+
+            string? error = LibrarySaver.Save(set, diff, parsed, edits, img);
+
+            Assert.That(error, Does.Contain("Nothing was saved"));
+            Assert.That(stored(set), Is.EqualTo(Fixtures.Full));
+            Assert.That(File.Exists(Path.Combine(store.FilesDirectory(set.LibrarySetId), "fake.png")), Is.False);
+        }
+
+        [Test]
+        public void AddFileNeverOverwritesADifferentFileAndReusesIdenticalOnes()
+        {
+            var (set, _, _, _) = open(Fixtures.Full);
+            string a = Path.Combine(root, "a.png");
+            string b = Path.Combine(root, "b.png");
+            File.WriteAllBytes(a, new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1 });
+            File.WriteAllBytes(b, new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 2 });
+
+            string first = store.AddFile(set.LibrarySetId, a, "bg.png");
+            string same = store.AddFile(set.LibrarySetId, a, "bg.png");
+            string other = store.AddFile(set.LibrarySetId, b, "bg.png");
+
+            Assert.That(first, Is.EqualTo("bg.png"));
+            Assert.That(same, Is.EqualTo("bg.png"));
+            Assert.That(other, Is.EqualTo("bg-2.png"));
+            Assert.That(File.ReadAllBytes(Path.Combine(store.FilesDirectory(set.LibrarySetId), "bg.png")), Is.EqualTo(File.ReadAllBytes(a)));
+        }
+
+        [Test]
         public void ARealEditIsSavedBackedUpAndEverythingElseIsPreserved()
         {
             var (set, diff, parsed, edits) = open(Fixtures.Full);

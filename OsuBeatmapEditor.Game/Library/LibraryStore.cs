@@ -438,6 +438,61 @@ namespace OsuBeatmapEditor.Game.Library
             }
         }
 
+        /// <summary>
+        /// Copies a file into a set's files folder under a safe name and returns the stored name. An existing file with the same
+        /// name is never overwritten: identical content is reused, different content gets a numbered name. The set record is
+        /// not touched (files are found by name).
+        /// </summary>
+        public string AddFile(string setId, string sourcePath, string desiredName)
+        {
+            lock (gate)
+            {
+                requireSet(setId);
+
+                string clean = LibraryActions.SafeFileName(Path.GetFileName(desiredName));
+                if (SetArchive.CheckName(clean, out string name) != SetArchive.NameVerdict.Ok)
+                    throw new LibraryException("Invalid file name.");
+
+                string dir = FilesDirectory(setId);
+                Directory.CreateDirectory(dir);
+                byte[] data = File.ReadAllBytes(sourcePath);
+
+                string stem = Path.GetFileNameWithoutExtension(name), ext = Path.GetExtension(name);
+                string candidate = name;
+                for (int i = 2; ; i++)
+                {
+                    string full = Path.Combine(dir, candidate);
+                    if (!File.Exists(full))
+                        break;
+
+                    if (File.ReadAllBytes(full).AsSpan().SequenceEqual(data))
+                        return candidate; // already stored
+
+                    candidate = $"{stem}-{i}{ext}";
+                }
+
+                string target = Path.Combine(dir, candidate);
+                string temp = target + ".saving-" + Guid.NewGuid().ToString("N");
+                try
+                {
+                    using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    {
+                        stream.Write(data, 0, data.Length);
+                        stream.Flush(true);
+                    }
+
+                    File.Move(temp, target, overwrite: false);
+                }
+                catch
+                {
+                    try { File.Delete(temp); } catch { /* best effort */ }
+                    throw;
+                }
+
+                return candidate;
+            }
+        }
+
         /// <summary>Backups of a difficulty, oldest first (names are opaque; pass one to <see cref="RestoreBackup"/>).</summary>
         public IReadOnlyList<string> ListBackups(string setId, string fileName)
         {
