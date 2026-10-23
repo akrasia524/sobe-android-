@@ -70,6 +70,7 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             Ar = p.EffectiveApproachRate,
             Od = p.OverallDifficulty,
             StackLeniency = p.StackLeniency,
+            DistanceSpacing = p.DistanceSpacing,
             SliderMultiplier = p.SliderMultiplier,
             SliderTickRate = p.SliderTickRate,
             ComboColours = p.ComboColours.ToList(),

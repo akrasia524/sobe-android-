@@ -162,6 +162,9 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         /// <summary>How aggressively nearby objects stack (osu! [General] StackLeniency; default 0.7).</summary>
         public float StackLeniency { get; set; } = 0.7f;
 
+        /// <summary>The editor's distance-snap multiplier ([Editor] DistanceSpacing; default 1).</summary>
+        public float DistanceSpacing { get; set; } = 1f;
+
         /// <summary>Base slider velocity multiplier ([Difficulty] SliderMultiplier; default 1.4), used to time placed sliders.</summary>
         public float SliderMultiplier { get; set; } = 1.4f;
 

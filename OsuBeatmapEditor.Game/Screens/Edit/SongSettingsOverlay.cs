@@ -69,7 +69,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             diffRow("OD", beatmap.Od),
             diffRow("Stack Leniency", beatmap.StackLeniency),
             diffRow("Slider Velocity", beatmap.SliderMultiplier),
-            diffRow("Slider Tick Rate", beatmap.SliderTickRate));
+            diffRow("Slider Tick Rate", beatmap.SliderTickRate),
+            diffRow("Distance Snap", beatmap.DistanceSpacing));
 
         private Drawable field(string label, Bindable<string> bindable) => new FillFlowContainer
         {

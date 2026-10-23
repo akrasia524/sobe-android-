@@ -100,6 +100,10 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             // values when it opens it, so an unedited value must be compared AFTER the same constraint).
             if (!sameNumber(Constrain(orig.StackLeniency, 0f, 1f, 0.1f), e.StackLeniency))
                 setKey(doc, "General", "StackLeniency", fmt(e.StackLeniency), true);
+
+            // Same rule for the distance-snap multiplier: only written when it was actually changed.
+            if (!sameNumber(Constrain(orig.DistanceSpacing, 0.1f, 6f, 0.1f), e.DistanceSpacing))
+                setKey(doc, "Editor", "DistanceSpacing", fmt(e.DistanceSpacing), true);
         }
 
         private static void patchMetadata(Doc doc, ParsedBeatmap orig, BeatmapSaver.Edits e)

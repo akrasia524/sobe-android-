@@ -22,6 +22,9 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             public float Hp, Cs, Ar, Od, StackLeniency = 0.7f;
             public float SliderMultiplier = 1.4f, SliderTickRate = 1f;
 
+            /// <summary>[Editor] DistanceSpacing (the editor's distance-snap multiplier).</summary>
+            public float DistanceSpacing = 1f;
+
             /// <summary>The computed star rating to persist to the realm (so the carousel/lazer reflect it). -1 = leave as-is.</summary>
             public double StarRating = -1;
 

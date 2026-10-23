@@ -187,7 +187,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             get => distanceSnap.Value;
             set => distanceSnap.Value = value;
         }
-        private double distanceSpacing = 1.0;
+        // The map's distance-snap multiplier (lives on the editable beatmap so Song Setup can change it and it is saved).
+        private double distanceSpacing
+        {
+            get => editable.DistanceSpacing.Value;
+            set => editable.DistanceSpacing.Value = (float)value;
+        }
         // Grid snapping (T): when on, placement snaps to the nearest visual-grid intersection.
         private bool gridSnapEnabled;
 
@@ -7541,6 +7546,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             Ar = editable.Ar.Value,
             Od = editable.Od.Value,
             StackLeniency = editable.StackLeniency.Value,
+            DistanceSpacing = editable.DistanceSpacing.Value,
             SliderMultiplier = editable.SliderMultiplier.Value,
             SliderTickRate = editable.SliderTickRate.Value,
             ComboColours = editable.MapColours.Select(c => c.Value).ToList(),
@@ -7747,7 +7753,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Alt+scroll adjusts the distance-snap spacing multiplier, like lazer.
             if (e.AltPressed)
             {
-                distanceSpacing = Math.Clamp(distanceSpacing + (e.ScrollDelta.Y > 0 ? 0.1 : -0.1), 0.1, 4.0);
+                distanceSpacing = Math.Clamp(distanceSpacing + (e.ScrollDelta.Y > 0 ? 0.1 : -0.1), 0.1, 6.0);
                 return true;
             }
 

@@ -90,6 +90,7 @@ namespace OsuBeatmapEditor.Game.Beatmaps
 
                     case "Editor":
                         parseKeyValue(line, "Bookmarks", v => parseBookmarks(v, result));
+                        parseKeyValue(line, "DistanceSpacing", v => setFloat(v, x => result.DistanceSpacing = x));
                         break;
 
                     case "Metadata":
