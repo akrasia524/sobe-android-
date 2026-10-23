@@ -102,8 +102,8 @@ namespace OsuBeatmapEditor.Game.Beatmaps
                 setKey(doc, "General", "StackLeniency", fmt(e.StackLeniency), true);
 
             // Same rule for the distance-snap multiplier: only written when it was actually changed.
-            if (!sameNumber(Constrain(orig.DistanceSpacing, 0.1f, 6f, 0.1f), e.DistanceSpacing))
-                setKey(doc, "Editor", "DistanceSpacing", fmt(e.DistanceSpacing), true);
+            if (e.DistanceSpacing is float spacing && !sameNumber(Constrain(orig.DistanceSpacing, 0.1f, 6f, 0.1f), spacing))
+                setKey(doc, "Editor", "DistanceSpacing", fmt(spacing), true);
         }
 
         private static void patchMetadata(Doc doc, ParsedBeatmap orig, BeatmapSaver.Edits e)
