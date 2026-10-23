@@ -23,6 +23,9 @@ namespace OsuBeatmapEditor.Game.Library
         /// into app storage and calls back with the local path. Null where no such picker exists (desktop uses the system dialog).
         /// </summary>
         public static Action<Action<PickResult>>? PickMap { get; set; }
+
+        /// <summary>Set by the Android host: the same chooser for one background image (.jpg / .png), copied into app storage.</summary>
+        public static Action<Action<PickResult>>? PickImage { get; set; }
     }
 
     /// <summary>Checks and names audio files that came from a file chooser. UI- and Android-free so it can be tested.</summary>

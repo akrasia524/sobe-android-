@@ -30,6 +30,7 @@ namespace OsuBeatmapEditor.Android
             LibraryActions.Publisher = publishToDownloads;
             PlatformPicker.PickAudio = startAudioPick;
             PlatformPicker.PickMap = startMapPick;
+            PlatformPicker.PickImage = startImagePick;
         }
 
         // Landscape only, enforced in code as well as by the [Activity] attribute: some phones/ROMs let the surface
@@ -124,6 +125,92 @@ namespace OsuBeatmapEditor.Android
             {
                 pendingAudioPick = null;
                 done(new PickResult(null, "Could not open a file chooser: " + e.Message));
+            }
+        }
+
+        private const int image_pick_request = 0x50AF;
+        private System.Action<PickResult>? pendingImagePick;
+
+        /// <summary>Opens the same chooser for one background image (.jpg / .png).</summary>
+        private void startImagePick(System.Action<PickResult> done)
+        {
+            pendingImagePick = done;
+
+            try
+            {
+                var intent = new Intent(Intent.ActionGetContent);
+                intent.AddCategory(Intent.CategoryOpenable);
+                intent.SetType("*/*");
+                intent.PutExtra(Intent.ExtraMimeTypes, new[] { "image/jpeg", "image/png" });
+                intent.PutExtra(Intent.ExtraAllowMultiple, false);
+
+                StartActivityForResult(Intent.CreateChooser(intent, "Choose a background image"), image_pick_request);
+            }
+            catch (System.Exception e)
+            {
+                pendingImagePick = null;
+                done(new PickResult(null, "Could not open a file chooser: " + e.Message));
+            }
+        }
+
+        /// <summary>Copies the chosen image into the app cache (never touching the original); the extension follows the real image type.</summary>
+        private PickResult copyPickedImage(global::Android.Net.Uri uri)
+        {
+            string? dir = null;
+
+            try
+            {
+                string? displayName = null;
+                using (var cursor = ContentResolver!.Query(uri, new[] { "_display_name" }, null, null, null))
+                {
+                    if (cursor != null && cursor.MoveToFirst())
+                        displayName = cursor.GetString(0);
+                }
+
+                dir = System.IO.Path.Combine(CacheDir!.AbsolutePath, "image-pick", System.Guid.NewGuid().ToString("N"));
+                System.IO.Directory.CreateDirectory(dir);
+                string temp = System.IO.Path.Combine(dir, "picked.bin");
+
+                using (var input = ContentResolver.OpenInputStream(uri))
+                {
+                    if (input == null)
+                        return new PickResult(null, "The chosen app did not provide the file.");
+
+                    using var output = System.IO.File.Create(temp);
+                    byte[] buffer = new byte[81920];
+                    long total = 0;
+                    int n;
+
+                    while ((n = input.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        total += n;
+                        if (total > PickedImage.MAX_BYTES)
+                            throw new System.IO.IOException($"the file is larger than {PickedImage.MAX_BYTES / 1024 / 1024} MB");
+
+                        output.Write(buffer, 0, n);
+                    }
+                }
+
+                byte[] head = new byte[8];
+                int read;
+                using (var fs = System.IO.File.OpenRead(temp))
+                    read = fs.Read(head, 0, head.Length);
+
+                string? ext = PickedImage.SniffExtension(head, read);
+                if (ext == null)
+                {
+                    tryDeleteDir(dir);
+                    return new PickResult(null, "That file is not a .jpg or .png image.");
+                }
+
+                string target = System.IO.Path.Combine(dir, PickedImage.FinalName(displayName, uri.LastPathSegment, ext));
+                System.IO.File.Move(temp, target);
+                return new PickResult(target, null);
+            }
+            catch (System.Exception e)
+            {
+                tryDeleteDir(dir);
+                return new PickResult(null, "Could not read the chosen file: " + e.Message);
             }
         }
 
@@ -227,6 +314,24 @@ namespace OsuBeatmapEditor.Android
                 }
 
                 System.Threading.Tasks.Task.Run(() => mapDone(copyPickedMap(mapUri)));
+                return;
+            }
+
+            if (requestCode == image_pick_request)
+            {
+                var imageDone = pendingImagePick;
+                pendingImagePick = null;
+                if (imageDone == null)
+                    return;
+
+                var imageUri = data?.Data ?? data?.ClipData?.GetItemAt(0)?.Uri;
+                if (resultCode != Result.Ok || imageUri == null)
+                {
+                    imageDone(new PickResult(null, null)); // cancelled
+                    return;
+                }
+
+                System.Threading.Tasks.Task.Run(() => imageDone(copyPickedImage(imageUri)));
                 return;
             }
 
