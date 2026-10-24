@@ -129,6 +129,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Asks the editor to seek the track to a time (ms); used by <see cref="ScrollMode"/> drags.</summary>
         public Action<double>? SeekRequested;
 
+        // Scroll mode: the one object that can be dragged, set only by tapping it on the timeline (-1 = none, so every drag scrolls).
+        private int armedMoveId = -1;
+
         private bool scrollDragging;
         private double? lastScrollTarget;
         private double scrollDragStartTime;
@@ -1973,6 +1976,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 // to Select mode for one object). The placement tool stays armed. Part selection (slider head/tail/body) works
                 // the same two-stage way as in Select mode.
                 int tapped = objectAt(timeAt(e.ScreenSpaceMousePosition), ToLocalSpace(e.ScreenSpaceMousePosition).Y);
+                armedMoveId = tapped; // tapping an object lets you drag it next; tapping empty space disarms
                 if (tapped >= 0)
                 {
                     double tapTime = timeAt(e.ScreenSpaceMousePosition);
@@ -2103,13 +2107,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             if (ScrollMode)
             {
-                // Only an already-selected object can be dragged: tap it first, then drag. A drag that starts on an
-                // unselected object (or on empty space) scrolls the timeline, so scrolling can't move objects by accident.
+                // An object can only be dragged right after it was TAPPED on the timeline (armedMoveId). Any other drag - on
+                // empty space, on an object that merely stays selected from placing it, over a slider body - scrolls the timeline.
                 if (e.Button == MouseButton.Left)
                 {
                     double downTime = timeAt(e.ScreenSpaceMouseDownPosition);
                     int grabbed = objectAt(downTime, ToLocalSpace(e.ScreenSpaceMouseDownPosition).Y);
-                    if (grabbed >= 0 && selection.Contains(grabbed))
+                    if (grabbed >= 0 && grabbed == armedMoveId && selection.Contains(grabbed))
                     {
                         moving = true;
                         moveGrabbedId = grabbed;
@@ -2119,6 +2123,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     }
                 }
 
+                armedMoveId = -1; // scrolling disarms: moving needs a fresh tap on the object
                 scrollDragging = true;
                 lastScrollTarget = null;
                 scrollDragStartTime = currentTime();
