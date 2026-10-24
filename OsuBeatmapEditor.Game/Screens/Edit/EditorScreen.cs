@@ -465,6 +465,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             editable = new EditableBeatmap(parsed, settings.DefaultCreator.Value, settings);
 
+            editable.ChooseBackground = chooseBackgroundWithPicker;
             deps.CacheAs(settings);
             deps.CacheAs(editable);
             deps.CacheAs(selection);
@@ -1866,6 +1867,35 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 ? " (note: it was authored on a different version of this map)" : string.Empty;
             toasts?.Push($"Imported {added} annotation{(added == 1 ? "" : "s")} from {imported.Author}{warn}",
                 added > 0 ? EditorTheme.Colours.Success : EditorTheme.Colours.Info);
+        }
+
+        /// <summary>Song Setup's "Choose background image" button (Android): picks a .jpg/.png and applies it like a dropped image.</summary>
+        private void chooseBackgroundWithPicker()
+        {
+            var pick = Library.PlatformPicker.PickImage;
+            if (pick == null)
+                return;
+
+            pick(result => Schedule(() =>
+            {
+                if (result.Cancelled)
+                    return;
+
+                if (result.Path == null)
+                {
+                    toasts?.Push(result.Error ?? "Couldn't open that image", EditorTheme.Colours.Error);
+                    return;
+                }
+
+                string? problem = Library.PickedImage.Validate(result.Path);
+                if (problem != null)
+                {
+                    toasts?.Push(problem, EditorTheme.Colours.Error);
+                    return;
+                }
+
+                applyDroppedBackground(result.Path);
+            }));
         }
 
         /// <summary>

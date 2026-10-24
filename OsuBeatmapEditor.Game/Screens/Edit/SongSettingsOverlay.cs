@@ -60,7 +60,45 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             field("Beatmap creator", beatmap.Creator),
             field("Difficulty name", beatmap.Version),
             field("Source", beatmap.Source),
-            field("Tags", beatmap.Tags));
+            field("Tags", beatmap.Tags),
+            backgroundRow());
+
+        /// <summary>"Background image" row (Android picker only): choose a .jpg/.png for this map. Applies live; saved with the map.</summary>
+        private Drawable backgroundRow()
+        {
+            if (Library.PlatformPicker.PickImage == null)
+                return new Container { RelativeSizeAxes = Axes.X };
+
+            var status = new SpriteText
+            {
+                Colour = EditorTheme.Colours.TextMuted,
+                Font = EditorTheme.Type.Caption(),
+            };
+            beatmap.HasBackground.BindValueChanged(b => status.Text = b.NewValue ? "This map has a background." : "No background yet.", true);
+
+            return new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, EditorTheme.Spacing.Xs),
+                Children = new Drawable[]
+                {
+                    new SpriteText
+                    {
+                        Text = "Background image",
+                        Colour = EditorTheme.Colours.TextMuted,
+                        Font = EditorTheme.Type.Label(),
+                    },
+                    new OsuButton("Choose background image", OsuColour.Pink)
+                    {
+                        Size = new Vector2(260, 40),
+                        Action = () => beatmap.ChooseBackground?.Invoke(),
+                    },
+                    status,
+                },
+            };
+        }
 
         private Drawable buildDifficultySection() => flow(
             diffRow("HP", beatmap.Hp),

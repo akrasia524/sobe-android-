@@ -49,6 +49,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>True while the open map has a background image (drives the "auto colours from background" UI).</summary>
         public readonly BindableBool HasBackground = new BindableBool();
 
+        /// <summary>Set by the editor: opens the image chooser and applies the chosen background (Song Setup's button).</summary>
+        public Action? ChooseBackground;
+
         /// <summary>Set by the editor: extracts <c>n</c> combo colours from the current background image (empty if none).</summary>
         public Func<int, IReadOnlyList<Colour4>>? ExtractBackgroundColours;
 
