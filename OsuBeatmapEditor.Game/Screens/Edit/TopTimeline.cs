@@ -1968,7 +1968,31 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         protected override bool OnClick(ClickEvent e)
         {
             if (ScrollMode)
-                return true; // scroll mode never selects / clears on tap
+            {
+                // Scroll mode never clears the selection on an empty tap, but tapping an object selects it (no need to switch
+                // to Select mode for one object). The placement tool stays armed. Part selection (slider head/tail/body) works
+                // the same two-stage way as in Select mode.
+                int tapped = objectAt(timeAt(e.ScreenSpaceMousePosition), ToLocalSpace(e.ScreenSpaceMousePosition).Y);
+                if (tapped >= 0)
+                {
+                    double tapTime = timeAt(e.ScreenSpaceMousePosition);
+                    bool sole = selection.Selected.Count == 1 && selection.Contains(tapped);
+                    if (!sole)
+                    {
+                        selection.SetSingle(tapped);
+                        nodeSelection.Clear();
+                    }
+                    else if (isSlider(tapped))
+                    {
+                        if (sliderNodeAt(tapped, tapTime, out int tappedNode))
+                            nodeSelection.Select(tapped, tappedNode);
+                        else
+                            nodeSelection.SelectBody(tapped);
+                    }
+                }
+
+                return true;
+            }
 
             // Clicks on the control gutter belong to its inline controls; never clear the selection or paint there.
             if (inLaneGutter(e.ScreenSpaceMousePosition))
@@ -2079,6 +2103,25 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             if (ScrollMode)
             {
+                // Pressing on an object and dragging moves it (and selects it first if needed), like Select mode. Dragging
+                // on empty space still scrolls the timeline.
+                if (e.Button == MouseButton.Left)
+                {
+                    double downTime = timeAt(e.ScreenSpaceMouseDownPosition);
+                    int grabbed = objectAt(downTime, ToLocalSpace(e.ScreenSpaceMouseDownPosition).Y);
+                    if (grabbed >= 0)
+                    {
+                        if (!selection.Contains(grabbed))
+                            selection.SetSingle(grabbed);
+
+                        moving = true;
+                        moveGrabbedId = grabbed;
+                        moveStartTime = downTime;
+                        actions.BeginMove();
+                        return true;
+                    }
+                }
+
                 scrollDragging = true;
                 lastScrollTarget = null;
                 scrollDragStartTime = currentTime();

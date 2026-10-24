@@ -15,7 +15,7 @@ namespace OsuBeatmapEditor.Game.UI
 {
     /// <summary>
     /// Phone-only toggle for the top timeline's touch mode: "Select" (drag selects / moves objects, like desktop) or
-    /// "Scroll" (drag scrolls the timeline so objects can be placed precisely). Shows the current mode in bold text
+    /// "Scroll" (drag on empty space scrolls the timeline so objects can be placed precisely; tapping an object selects it and dragging it moves it). Shows the current mode in bold text
     /// with a matching coloured outline (orange = Select, purple = Scroll). Tapping switches the mode.
     /// </summary>
     public partial class TimelineModeButton : ClickableContainer, IHasTooltip
@@ -33,7 +33,7 @@ namespace OsuBeatmapEditor.Game.UI
             Action = () => this.scrollMode.Value = !this.scrollMode.Value;
         }
 
-        public LocalisableString TooltipText => "Top timeline mode: Scroll (drag to scroll) / Select (drag to select and move objects)";
+        public LocalisableString TooltipText => "Top timeline mode: Scroll (drag empty space to scroll; tap an object to select it, drag it to move) / Select (drag to rubber-band select and move objects)";
 
         [BackgroundDependencyLoader]
         private void load()
