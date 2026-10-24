@@ -126,6 +126,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public readonly BindableBool MultiThreaded = new BindableBool(false);
 
         /// <summary>Phone only: draw the action-button cluster as one cached picture instead of ~25 separate buttons every frame. Applies when a map is (re)opened.</summary>
+        /// <summary>Phone only, deliberately NOT saved (always 100% at launch, so a bad value can never lock you out): fraction of the screen's pixels the game renders at.</summary>
+        public readonly BindableFloat RenderScale = new BindableFloat(1f) { MinValue = 0.5f, MaxValue = 1f };
+
         public readonly BindableBool CacheButtons = new BindableBool(false);
 
         /// <summary>

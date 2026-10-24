@@ -31,6 +31,51 @@ namespace OsuBeatmapEditor.Android
             PlatformPicker.PickAudio = startAudioPick;
             PlatformPicker.PickMap = startMapPick;
             PlatformPicker.PickImage = startImagePick;
+            PlatformPicker.SetRenderScale = setRenderScale;
+        }
+
+        /// <summary>
+        /// Renders at a fraction of the screen's pixels by giving the game's surface a smaller fixed buffer; Android scales it up for
+        /// free in hardware. 1 restores the native size. Fewer pixels to fill is the biggest win on a slow phone GPU.
+        /// </summary>
+        private void setRenderScale(float scale)
+        {
+            RunOnUiThread(() =>
+            {
+                try
+                {
+                    var surface = findSurfaceView(Window?.DecorView);
+                    if (surface?.Holder == null || surface.Width <= 0 || surface.Height <= 0)
+                        return;
+
+                    if (scale >= 0.99f)
+                        surface.Holder.SetSizeFromLayout();
+                    else
+                        surface.Holder.SetFixedSize((int)(surface.Width * scale) & ~1, (int)(surface.Height * scale) & ~1);
+                }
+                catch
+                {
+                    // Best effort: leave the surface as it is.
+                }
+            });
+        }
+
+        private static global::Android.Views.SurfaceView? findSurfaceView(global::Android.Views.View? view)
+        {
+            if (view is global::Android.Views.SurfaceView sv)
+                return sv;
+
+            if (view is global::Android.Views.ViewGroup group)
+            {
+                for (int i = 0; i < group.ChildCount; i++)
+                {
+                    var found = findSurfaceView(group.GetChildAt(i));
+                    if (found != null)
+                        return found;
+                }
+            }
+
+            return null;
         }
 
         // Landscape only, enforced in code as well as by the [Activity] attribute: some phones/ROMs let the surface
