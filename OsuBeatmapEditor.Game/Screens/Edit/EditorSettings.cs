@@ -126,9 +126,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public readonly BindableBool MultiThreaded = new BindableBool(false);
 
         /// <summary>Phone only: draw the action-button cluster as one cached picture instead of ~25 separate buttons every frame. Applies when a map is (re)opened.</summary>
-        /// <summary>Phone: draw the top timeline's object circles as plain discs (no white outline) - cheaper to draw. Applies to objects drawn after it is changed (re-open the map).</summary>
-        public readonly BindableBool SimpleTimelineMarkers = new BindableBool(false);
-
         public readonly BindableBool CacheButtons = new BindableBool(false);
 
         /// <summary>
@@ -310,7 +307,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             PowerSaving.ValueChanged += _ => save();
             MultiThreaded.ValueChanged += _ => save();
             CacheButtons.ValueChanged += _ => save();
-            SimpleTimelineMarkers.ValueChanged += _ => save();
             AutoKeyOverlay.ValueChanged += _ => save();
             AutoHumanize.ValueChanged += _ => save();
             ReviewShowAlways.ValueChanged += _ => save();
@@ -393,9 +389,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 if (data.TryGetValue("cacheButtons", out string? cb) && bool.TryParse(cb, out bool cbValue))
                     CacheButtons.Value = cbValue;
 
-                if (data.TryGetValue("simpleTimelineMarkers", out string? stm) && bool.TryParse(stm, out bool stmValue))
-                    SimpleTimelineMarkers.Value = stmValue;
-
                 if (data.TryGetValue("autoKeyOverlay", out string? keyOverlay) && bool.TryParse(keyOverlay, out bool keyOverlayValue))
                     AutoKeyOverlay.Value = keyOverlayValue;
 
@@ -475,7 +468,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["powerSaving"] = PowerSaving.Value.ToString();
                 data["multiThreaded"] = MultiThreaded.Value.ToString();
                 data["cacheButtons"] = CacheButtons.Value.ToString();
-                data["simpleTimelineMarkers"] = SimpleTimelineMarkers.Value.ToString();
                 data["autoKeyOverlay"] = AutoKeyOverlay.Value.ToString();
                 data["autoHumanize"] = AutoHumanize.Value.ToString();
                 data["hideTooltips"] = HideTooltips.Value.ToString();
