@@ -122,6 +122,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                      + "which can raise the frame rate a lot on phones. Experimental: if the editor "
                                      + "ever glitches or crashes, switch this off."));
                 items.Add(divider());
+                items.Add(toggleRow("Simple timeline markers (faster)", settings.SimpleTimelineMarkers));
+                items.Add(description("Draws the objects on the top timeline as plain coloured discs without the white outline, "
+                                     + "which is cheaper to draw on busy maps. Selected objects still get their yellow ring. "
+                                     + "Takes effect after you re-open the map."));
+                items.Add(divider());
                 items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
                 items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "
                                      + "one every frame. Takes effect the next time you open a map. If a button ever looks "

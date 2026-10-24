@@ -1654,7 +1654,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 Y = object_centre_y,
                 Size = new Vector2(object_size),
                 Masking = true,
-                BorderThickness = 2,
+                BorderThickness = settings.SimpleTimelineMarkers.Value ? 0 : 2,
                 BorderColour = Color4.White,
                 Children = children.ToArray(),
             };
@@ -2370,7 +2370,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 foreach (var c in circles)
                 {
                     c.BorderColour = sel ? OsuColour.Yellow : Color4.White;
-                    c.BorderThickness = sel ? 3f : 2f;
+                    c.BorderThickness = sel ? 3f : (settings.SimpleTimelineMarkers.Value ? 0f : 2f);
                     c.EdgeEffect = sel ? yellowGlow(0.55f, 5f) : default;
                 }
             }
