@@ -156,8 +156,6 @@ namespace OsuBeatmapEditor.Game
             if (mode == null)
                 return;
 
-            tooltipSettings.RenderScale.BindValueChanged(e => Library.PlatformPicker.SetRenderScale?.Invoke(e.NewValue));
-
             tooltipSettings.MultiThreaded.BindValueChanged(e =>
                 mode.Value = e.NewValue ? osu.Framework.Platform.ExecutionMode.MultiThreaded : osu.Framework.Platform.ExecutionMode.SingleThread, true);
         }

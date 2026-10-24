@@ -122,19 +122,6 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                      + "which can raise the frame rate a lot on phones. Experimental: if the editor "
                                      + "ever glitches or crashes, switch this off."));
                 items.Add(divider());
-                var scaleButton = new OsuButton("Render quality: 100%", OsuColour.Surface) { Size = new Vector2(260, 36) };
-                float[] scales = { 1f, 0.85f, 0.75f, 0.6f };
-                scaleButton.Action = () =>
-                {
-                    int i = System.Array.FindIndex(scales, s => System.Math.Abs(s - settings.RenderScale.Value) < 0.01f);
-                    settings.RenderScale.Value = scales[(i + 1) % scales.Length];
-                };
-                settings.RenderScale.BindValueChanged(e => scaleButton.Text = $"Render quality: {e.NewValue * 100:0}%", true);
-                items.Add(scaleButton);
-                items.Add(description("Draws the editor at fewer pixels and lets the phone scale it up. 85% / 75% / 60% make the "
-                                     + "picture a little softer but can raise the frame rate a lot. It always goes back to 100% "
-                                     + "when the app restarts. If touches ever land in the wrong place, restart the app."));
-                items.Add(divider());
                 items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
                 items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "
                                      + "one every frame. Takes effect the next time you open a map. If a button ever looks "

@@ -26,9 +26,6 @@ namespace OsuBeatmapEditor.Game.Library
 
         /// <summary>Set by the Android host: the same chooser for one background image (.jpg / .png), copied into app storage.</summary>
         public static Action<Action<PickResult>>? PickImage { get; set; }
-
-        /// <summary>Set by the Android host: renders the game at this fraction (0.5-1) of the screen's pixels and lets the system scale it up. Fewer pixels = faster on a slow GPU.</summary>
-        public static Action<float>? SetRenderScale { get; set; }
     }
 
     /// <summary>Checks and names audio files that came from a file chooser. UI- and Android-free so it can be tested.</summary>
