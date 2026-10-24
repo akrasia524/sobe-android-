@@ -13,6 +13,9 @@ namespace OsuBeatmapEditor.Game.UI
     public partial class FpsCounter : ClickableContainer, osu.Framework.Graphics.Cursor.IHasTooltip
     {
         private SpriteText text = null!;
+
+        [osu.Framework.Allocation.Resolved]
+        private osu.Framework.Platform.GameHost host { get; set; } = null!;
         private double averageFrameTime;
         private double sinceTextUpdate;
 
@@ -58,7 +61,13 @@ namespace OsuBeatmapEditor.Game.UI
             if (sinceTextUpdate >= 250)
             {
                 sinceTextUpdate = 0;
-                text.Text = $"{1000.0 / averageFrameTime:0} FPS";
+                // In multi-threaded mode the update thread can race ahead (100+ Hz) while the screen still only redraws at the
+                // draw thread's pace, so show the DRAW rate - the frames you actually see - plus the update rate.
+                double draw = host.DrawThread.Clock.FramesPerSecond;
+                double update = 1000.0 / averageFrameTime;
+                text.Text = draw > 0 && draw < update * 0.9
+                    ? $"{draw:0} FPS (upd {update:0})"
+                    : $"{update:0} FPS";
             }
         }
     }
