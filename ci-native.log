@@ -1,0 +1,30 @@
+== libraries in APK (arm64-v8a)
+total 66768
+-rwxr--r-- 1 runner runner 12192088 May 20 10:26 libSDL3.so
+-rwxr--r-- 1 runner runner   730776 Oct  4 20:47 libSystem.IO.Compression.Native.so
+-rwxr--r-- 1 runner runner    99256 Oct  4 20:47 libSystem.Native.so
+-rwxr--r-- 1 runner runner   160512 Oct  4 20:47 libSystem.Security.Cryptography.Native.Android.so
+-rw-r--r-- 1 runner runner 16240744 Oct 24 14:33 libavcodec.so
+-rw-r--r-- 1 runner runner    67704 Oct 24 14:33 libavdevice.so
+-rw-r--r-- 1 runner runner  4545360 Oct 24 14:33 libavformat.so
+-rw-r--r-- 1 runner runner   330256 Oct 24 14:33 libavutil.so
+-rw-r--r-- 1 runner runner   322992 Oct 24 14:33 libbass.so
+-rw-r--r-- 1 runner runner   104344 Oct 24 14:33 libbass_fx.so
+-rw-r--r-- 1 runner runner    59072 Oct 24 14:33 libbassmix.so
+-rw-r--r-- 1 runner runner   936368 Oct 24 14:33 libc++_shared.so
+-rw-r--r-- 1 runner runner    10144 Oct 24 14:33 libcpufeatures.so
+-rw-r--r-- 1 runner runner    10184 Oct 24 14:33 libmobileffmpeg-abidetect.so
+-rw-r--r-- 1 runner runner   264520 Oct 24 14:33 libmobileffmpeg.so
+-rwxr--r-- 1 runner runner   202328 Oct  4 20:45 libmono-component-debugger.so
+-rwxr--r-- 1 runner runner    66656 Oct  4 20:45 libmono-component-hot_reload.so
+-rwxr--r-- 1 runner runner    36360 Oct  4 20:45 libmono-component-marshal-ilgen.so
+-rwxr--r-- 1 runner runner   472952 Mar 24  2025 libmonodroid.so
+-rwxr--r-- 1 runner runner  3092912 Oct  4 20:45 libmonosgen-2.0.so
+-rwxr--r-- 1 runner runner 10410016 Jan  7  2025 librealm-wrappers.so
+-rw-r--r-- 1 runner runner   199168 Oct 24 14:33 libswresample.so
+-rw-r--r-- 1 runner runner   329752 Oct 24 14:33 libswscale.so
+-rwxr--r-- 1 runner runner 15184840 Aug 30  2025 libveldrid-spirv.so
+-rw-r--r-- 1 runner runner  2206232 Oct 24 14:33 libxamarin-app.so
+-rwxr--r-- 1 runner runner    39568 Mar 24  2025 libxamarin-debug-app-helper.so
+== libraries that need desktop-Linux (glibc) system libraries
+== end
