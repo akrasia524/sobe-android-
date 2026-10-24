@@ -10,16 +10,20 @@ namespace OsuBeatmapEditor.Game.UI
     /// A small, unobtrusive frames-per-second readout. The rate is exponentially smoothed so the value
     /// stays readable rather than flickering every frame.
     /// </summary>
-    public partial class FpsCounter : Container
+    public partial class FpsCounter : ClickableContainer, osu.Framework.Graphics.Cursor.IHasTooltip
     {
         private SpriteText text = null!;
         private double averageFrameTime;
+        private double sinceTextUpdate;
+
+        public osu.Framework.Localisation.LocalisableString TooltipText => "Tap to show / cycle the performance details (frame times)";
 
         public FpsCounter()
         {
             AutoSizeAxes = Axes.Both;
             Masking = true;
             CornerRadius = 5;
+            Action = () => OsuBeatmapEditorGameBase.CyclePerformanceOverlay?.Invoke();
         }
 
         protected override void LoadComplete()
@@ -48,7 +52,14 @@ namespace OsuBeatmapEditor.Game.UI
 
             // Exponential moving average over frame time, then invert to a rate.
             averageFrameTime = averageFrameTime == 0 ? elapsed : averageFrameTime * 0.9 + elapsed * 0.1;
-            text.Text = $"{1000.0 / averageFrameTime:0} FPS";
+
+            // The text only needs refreshing a few times a second (a new string every frame is pointless garbage).
+            sinceTextUpdate += elapsed;
+            if (sinceTextUpdate >= 250)
+            {
+                sinceTextUpdate = 0;
+                text.Text = $"{1000.0 / averageFrameTime:0} FPS";
+            }
         }
     }
 }

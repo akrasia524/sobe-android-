@@ -15,6 +15,19 @@ namespace OsuBeatmapEditor.Game
 
         protected override Container<Drawable> Content { get; }
 
+        /// <summary>
+        /// Cycles the framework's own performance overlay (off -> frame times -> frame times + threads/GC -> off). It shows how
+        /// long each frame spends in Update (CPU logic), Draw (GPU submission) and Input, plus garbage-collection activity - the
+        /// numbers needed to tell what makes the editor slow. Wired to a tap on the FPS counter.
+        /// </summary>
+        public static System.Action? CyclePerformanceOverlay { get; private set; }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            CyclePerformanceOverlay = CycleFrameStatistics;
+        }
+
         protected OsuBeatmapEditorGameBase()
         {
             // Ensure game and tests scale with window size and screen DPI.
