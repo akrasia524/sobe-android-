@@ -125,6 +125,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// </summary>
         public readonly BindableBool MultiThreaded = new BindableBool(false);
 
+        /// <summary>Phone only: draw the action-button cluster as one cached picture instead of ~25 separate buttons every frame. Applies when a map is (re)opened.</summary>
+        public readonly BindableBool CacheButtons = new BindableBool(false);
+
         /// <summary>
         /// Diagnostic (not saved): which part of the editor interface is temporarily hidden so the FPS counter shows what that part costs.
         /// 0 = none, 1 = top timeline, 2 = bottom bar, 3 = phone buttons, 4 = side panels + chips.
@@ -303,6 +306,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             AutoUpdatePrompted.ValueChanged += _ => save();
             PowerSaving.ValueChanged += _ => save();
             MultiThreaded.ValueChanged += _ => save();
+            CacheButtons.ValueChanged += _ => save();
             AutoKeyOverlay.ValueChanged += _ => save();
             AutoHumanize.ValueChanged += _ => save();
             ReviewShowAlways.ValueChanged += _ => save();
@@ -382,6 +386,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 if (data.TryGetValue("multiThreaded", out string? mt) && bool.TryParse(mt, out bool mtValue))
                     MultiThreaded.Value = mtValue;
 
+                if (data.TryGetValue("cacheButtons", out string? cb) && bool.TryParse(cb, out bool cbValue))
+                    CacheButtons.Value = cbValue;
+
                 if (data.TryGetValue("autoKeyOverlay", out string? keyOverlay) && bool.TryParse(keyOverlay, out bool keyOverlayValue))
                     AutoKeyOverlay.Value = keyOverlayValue;
 
@@ -460,6 +467,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["autoUpdatePrompted"] = AutoUpdatePrompted.Value.ToString();
                 data["powerSaving"] = PowerSaving.Value.ToString();
                 data["multiThreaded"] = MultiThreaded.Value.ToString();
+                data["cacheButtons"] = CacheButtons.Value.ToString();
                 data["autoKeyOverlay"] = AutoKeyOverlay.Value.ToString();
                 data["autoHumanize"] = AutoHumanize.Value.ToString();
                 data["hideTooltips"] = HideTooltips.Value.ToString();

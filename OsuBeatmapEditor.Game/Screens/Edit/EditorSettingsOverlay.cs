@@ -121,6 +121,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 items.Add(description("Runs the editor's logic and its drawing on separate threads so they overlap, "
                                      + "which can raise the frame rate a lot on phones. Experimental: if the editor "
                                      + "ever glitches or crashes, switch this off."));
+                items.Add(divider());
+                items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
+                items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "
+                                     + "one every frame. Takes effect the next time you open a map. If a button ever looks "
+                                     + "wrong or stops responding, switch this off."));
             }
 
             items.Add(divider());

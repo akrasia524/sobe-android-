@@ -289,6 +289,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private bool hudHidden;
         private Container hudLayer = null!;
         private Container? phoneButtons;
+        private Container? phoneButtonsHost;
         private readonly System.Collections.Generic.List<(Drawable drawable, float alpha)> perfHidden = new System.Collections.Generic.List<(Drawable, float)>();
 
         /// <summary>Diagnostic: hides one part of the interface (settings.PerfHidePart) to measure what it costs; restores the previous one.</summary>
@@ -684,7 +685,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 // (Timing points F6, Distance snap Y, Convert slider to stream, Add BPM point, Add SV point).
                 // Sizes/positions are in design units, taken from the user's marked-up screenshot.
                 UI.MobileMetrics.IsMobile
-                    ? phoneButtons = new Container
+                    ? phoneButtonsHost = new Container
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Child = phoneButtons = new Container
                     {
                         RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
@@ -825,6 +829,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Margin = new MarginPadding { Right = 81, Top = 197 },
                             },
                         },
+                    },
                     }
                     : Empty(),
                 // Compact icon row in the bottom-left (right of the background-dim wheel): Patterns gallery + the
@@ -7139,6 +7144,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Greet the user with the beta notice unless they've opted out.
             if (settings.ShowBetaPopup.Value)
                 betaOverlay.Show();
+
+            // "Cache action buttons": draw the phone button cluster through one off-screen buffer, so it costs a single textured quad per frame
+            // and is only re-rendered when a button actually changes (hover/press/highlight).
+            if (settings.CacheButtons.Value && phoneButtons != null && phoneButtonsHost != null)
+            {
+                phoneButtonsHost.Remove(phoneButtons, false);
+                phoneButtonsHost.Add(new osu.Framework.Graphics.Containers.BufferedContainer { RelativeSizeAxes = Axes.Both, Child = phoneButtons });
+            }
 
             settings.PerfHidePart.Value = 0;
             settings.PerfHidePart.BindValueChanged(e => applyPerfHide(e.NewValue));
