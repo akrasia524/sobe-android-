@@ -2103,17 +2103,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         {
             if (ScrollMode)
             {
-                // Pressing on an object and dragging moves it (and selects it first if needed), like Select mode. Dragging
-                // on empty space still scrolls the timeline.
+                // Only an already-selected object can be dragged: tap it first, then drag. A drag that starts on an
+                // unselected object (or on empty space) scrolls the timeline, so scrolling can't move objects by accident.
                 if (e.Button == MouseButton.Left)
                 {
                     double downTime = timeAt(e.ScreenSpaceMouseDownPosition);
                     int grabbed = objectAt(downTime, ToLocalSpace(e.ScreenSpaceMouseDownPosition).Y);
-                    if (grabbed >= 0)
+                    if (grabbed >= 0 && selection.Contains(grabbed))
                     {
-                        if (!selection.Contains(grabbed))
-                            selection.SetSingle(grabbed);
-
                         moving = true;
                         moveGrabbedId = grabbed;
                         moveStartTime = downTime;
