@@ -130,9 +130,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         /// <summary>
         /// Diagnostic (not saved): which part of the editor interface is temporarily hidden so the FPS counter shows what that part costs.
-        /// 0 = none, 1 = top timeline, 2 = bottom bar, 3 = phone buttons, 4 = side panels + chips.
+        /// 0 = none, 1 = top timeline, 2 = bottom bar, 3 = phone buttons, 4 = side panels + chips, 5-7 = only the timeline's beat ticks / objects / timing lines.
         /// </summary>
-        public readonly BindableInt PerfHidePart = new BindableInt(0) { MinValue = 0, MaxValue = 4 };
+        public readonly BindableInt PerfHidePart = new BindableInt(0) { MinValue = 0, MaxValue = 7 };
 
         /// <summary>Whether the one-time "enable automatic updates?" prompt has been answered.</summary>
         public readonly BindableBool AutoUpdatePrompted = new BindableBool(false);

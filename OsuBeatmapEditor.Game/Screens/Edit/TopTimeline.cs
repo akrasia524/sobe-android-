@@ -515,6 +515,17 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             protected override void OnDragEnd(DragEndEvent e) => OnCommit?.Invoke();
         }
 
+        /// <summary>Diagnostic: hides one layer of the timeline (1 = beat ticks, 2 = objects, 3 = timing lines/breaks/mods), 0 = show all.</summary>
+        public void PerfHideLayer(int mode)
+        {
+            gridLayer.Alpha = mode == 1 ? 0 : 1;
+            objectLayer.Alpha = mode == 2 ? 0 : 1;
+            selectionLayer.Alpha = mode == 2 ? 0 : 1;
+            timingLayer.Alpha = mode == 3 ? 0 : 1;
+            breakLayer.Alpha = mode == 3 ? 0 : 1;
+            modLayer.Alpha = mode == 3 ? 0 : 1;
+        }
+
         /// <summary>Rebuilds the object markers (e.g. after a deletion changes the hit-object list).</summary>
         public void Rebuild() => buildObjects();
 
