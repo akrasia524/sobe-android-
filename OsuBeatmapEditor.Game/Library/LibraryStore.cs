@@ -493,59 +493,6 @@ namespace OsuBeatmapEditor.Game.Library
             }
         }
 
-        /// <summary>
-        /// Copies a file into a set's files folder (e.g. a new background image) and returns the stored name. An identical file
-        /// already there is reused; a different file with the same name is never overwritten (a numbered name is used instead).
-        /// The copy is written to a temporary file and renamed, so a failure leaves nothing half-written.
-        /// </summary>
-        public string AddFile(string setId, string desiredName, string sourcePath)
-        {
-            lock (gate)
-            {
-                requireSet(setId);
-
-                string wanted = LibraryActions.SafeFileName(desiredName);
-                if (SetArchive.CheckName(wanted, out string clean) != SetArchive.NameVerdict.Ok || clean.Contains('/'))
-                    throw new LibraryException("Invalid file name.");
-
-                string dir = FilesDirectory(setId);
-                Directory.CreateDirectory(dir);
-
-                string stem = Path.GetFileNameWithoutExtension(clean);
-                string ext = Path.GetExtension(clean);
-                byte[] data = File.ReadAllBytes(sourcePath);
-
-                for (int n = 1; n < 1000; n++)
-                {
-                    string name = n == 1 ? clean : $"{stem}-{n}{ext}";
-                    string target = Path.Combine(dir, name);
-
-                    if (File.Exists(target))
-                    {
-                        if (File.ReadAllBytes(target).AsSpan().SequenceEqual(data))
-                            return name;
-                        continue;
-                    }
-
-                    string temp = target + ".adding-" + Guid.NewGuid().ToString("N");
-                    try
-                    {
-                        File.WriteAllBytes(temp, data);
-                        File.Move(temp, target);
-                    }
-                    catch
-                    {
-                        try { File.Delete(temp); } catch { /* best effort */ }
-                        throw;
-                    }
-
-                    return name;
-                }
-
-                throw new LibraryException("Too many files with that name.");
-            }
-        }
-
         /// <summary>Backups of a difficulty, oldest first (names are opaque; pass one to <see cref="RestoreBackup"/>).</summary>
         public IReadOnlyList<string> ListBackups(string setId, string fileName)
         {
