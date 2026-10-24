@@ -61,6 +61,41 @@ namespace OsuBeatmapEditor.Game.Library
             return Save(set, difficulty, parsed, edits, false);
         }
 
+        /// <summary>
+        /// Saves the edit together with a newly chosen background image: the image is checked and copied into the set's
+        /// files first, then the difficulty's [Events] is pointed at it as part of the normal checked save. A bad image
+        /// stops everything (nothing is saved). With no image this is the plain save.
+        /// </summary>
+        public static string? Save(BeatmapSetModel set, BeatmapDifficultyModel difficulty, ParsedBeatmap parsed, BeatmapSaver.Edits edits, string? pendingBackgroundPath)
+        {
+            if (string.IsNullOrEmpty(pendingBackgroundPath))
+                return Save(set, difficulty, parsed, edits, false);
+
+            if (!set.IsLibrarySet || set.Library == null)
+                return "This beatmap is not in the library.";
+
+            string? problem = PickedImage.Validate(pendingBackgroundPath);
+            if (problem != null)
+                return "Background: " + problem + " Nothing was saved.";
+
+            try
+            {
+                string stored = set.Library.AddFile(set.LibrarySetId, Path.GetFileName(pendingBackgroundPath), pendingBackgroundPath);
+                edits.BackgroundFilename = stored;
+                parsed.BackgroundFilename = stored;
+            }
+            catch (LibraryException ex)
+            {
+                return ex.Message;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return "The background image could not be stored. Nothing was saved.";
+            }
+
+            return Save(set, difficulty, parsed, edits, false);
+        }
+
         /// <summary>Saves the edit. Returns null on success (including "nothing changed"), otherwise a message for the user.</summary>
         public static string? Save(BeatmapSetModel set, BeatmapDifficultyModel difficulty, ParsedBeatmap parsed, BeatmapSaver.Edits edits, bool hasPendingBackground)
         {
