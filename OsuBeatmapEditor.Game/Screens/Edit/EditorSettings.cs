@@ -119,6 +119,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// </summary>
         public readonly BindableBool PowerSaving = new BindableBool(false);
 
+        /// <summary>
+        /// Phone only: run Update and Draw on separate threads. Android's framework default is a single thread (update then
+        /// draw, so their times add up); two threads overlap them, so a frame costs about the larger of the two. Off by default.
+        /// </summary>
+        public readonly BindableBool MultiThreaded = new BindableBool(false);
+
         /// <summary>Whether the one-time "enable automatic updates?" prompt has been answered.</summary>
         public readonly BindableBool AutoUpdatePrompted = new BindableBool(false);
 
@@ -290,6 +296,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             DiscordRichPresence.ValueChanged += _ => save();
             AutoUpdatePrompted.ValueChanged += _ => save();
             PowerSaving.ValueChanged += _ => save();
+            MultiThreaded.ValueChanged += _ => save();
             AutoKeyOverlay.ValueChanged += _ => save();
             AutoHumanize.ValueChanged += _ => save();
             ReviewShowAlways.ValueChanged += _ => save();
@@ -365,6 +372,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 if (data.TryGetValue("powerSaving", out string? power) && bool.TryParse(power, out bool powerValue))
                     PowerSaving.Value = powerValue;
+
+                if (data.TryGetValue("multiThreaded", out string? mt) && bool.TryParse(mt, out bool mtValue))
+                    MultiThreaded.Value = mtValue;
 
                 if (data.TryGetValue("autoKeyOverlay", out string? keyOverlay) && bool.TryParse(keyOverlay, out bool keyOverlayValue))
                     AutoKeyOverlay.Value = keyOverlayValue;
@@ -443,6 +453,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["discordRichPresence"] = DiscordRichPresence.Value.ToString();
                 data["autoUpdatePrompted"] = AutoUpdatePrompted.Value.ToString();
                 data["powerSaving"] = PowerSaving.Value.ToString();
+                data["multiThreaded"] = MultiThreaded.Value.ToString();
                 data["autoKeyOverlay"] = AutoKeyOverlay.Value.ToString();
                 data["autoHumanize"] = AutoHumanize.Value.ToString();
                 data["hideTooltips"] = HideTooltips.Value.ToString();

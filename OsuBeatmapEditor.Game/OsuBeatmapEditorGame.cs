@@ -142,11 +142,30 @@ namespace OsuBeatmapEditor.Game
             }
         }
 
+        /// <summary>
+        /// Phone only: maps the "Multi-threaded mode" setting onto the framework's execution mode (Android defaults to single
+        /// thread). The framework switches modes live, so the toggle applies at once.
+        /// </summary>
+        private void applyThreadingMode()
+        {
+            if (!osu.Framework.RuntimeInfo.IsMobile || tooltipSettings == null)
+                return;
+
+            var mode = Dependencies.Get<osu.Framework.Configuration.FrameworkConfigManager>()?.GetBindable<osu.Framework.Platform.ExecutionMode>(
+                osu.Framework.Configuration.FrameworkSetting.ExecutionMode);
+            if (mode == null)
+                return;
+
+            tooltipSettings.MultiThreaded.BindValueChanged(e =>
+                mode.Value = e.NewValue ? osu.Framework.Platform.ExecutionMode.MultiThreaded : osu.Framework.Platform.ExecutionMode.SingleThread, true);
+        }
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
             applyFirstRunDefaults();
+            applyThreadingMode();
             screenStack.Push(new SongSelectScreen());
         }
     }

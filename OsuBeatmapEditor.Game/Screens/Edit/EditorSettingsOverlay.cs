@@ -104,11 +104,27 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 openFolder);
         }
 
-        private Drawable buildPerformanceSection() => section(
-            toggleRow("Power saving (cap to refresh rate)", settings.PowerSaving),
-            description("Limits the frame rate to your monitor's refresh rate instead of running at double it. "
-                       + "Lowers GPU/CPU use noticeably on high-refresh displays, with slightly more input latency. "
-                       + "The app also throttles itself automatically while its window isn't focused."));
+        private Drawable buildPerformanceSection()
+        {
+            var items = new List<Drawable>
+            {
+                toggleRow("Power saving (cap to refresh rate)", settings.PowerSaving),
+                description("Limits the frame rate to your monitor's refresh rate instead of running at double it. "
+                           + "Lowers GPU/CPU use noticeably on high-refresh displays, with slightly more input latency. "
+                           + "The app also throttles itself automatically while its window isn't focused."),
+            };
+
+            if (osu.Framework.RuntimeInfo.IsMobile)
+            {
+                items.Add(divider());
+                items.Add(toggleRow("Multi-threaded mode (faster)", settings.MultiThreaded));
+                items.Add(description("Runs the editor's logic and its drawing on separate threads so they overlap, "
+                                     + "which can raise the frame rate a lot on phones. Experimental: if the editor "
+                                     + "ever glitches or crashes, switch this off."));
+            }
+
+            return section(items.ToArray());
+        }
 
         private Drawable buildUpdatesSection()
         {
