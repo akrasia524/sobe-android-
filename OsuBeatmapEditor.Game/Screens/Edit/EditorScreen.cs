@@ -288,6 +288,33 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // hit objects show; the playfield recentres and grows slightly. Toggled with Shift+Tab or the eye button.
         private bool hudHidden;
         private Container hudLayer = null!;
+        private Container? phoneButtons;
+        private readonly System.Collections.Generic.List<(Drawable drawable, float alpha)> perfHidden = new System.Collections.Generic.List<(Drawable, float)>();
+
+        /// <summary>Diagnostic: hides one part of the interface (settings.PerfHidePart) to measure what it costs; restores the previous one.</summary>
+        private void applyPerfHide(int part)
+        {
+            foreach (var (d, alpha) in perfHidden)
+                d.Alpha = alpha;
+            perfHidden.Clear();
+
+            Drawable?[] targets = part switch
+            {
+                1 => new Drawable?[] { topTimeline?.Parent },
+                2 => new Drawable?[] { bottomTimeline, playbackControl },
+                3 => new Drawable?[] { phoneButtons },
+                4 => new Drawable?[] { timelineLeftPanel, timelineSidePanel, modButtons, leftPanels },
+                _ => System.Array.Empty<Drawable?>(),
+            };
+
+            foreach (var d in targets)
+            {
+                if (d == null)
+                    continue;
+                perfHidden.Add((d, d.Alpha));
+                d.Alpha = 0;
+            }
+        }
         private ModePill modePill = null!;
         private SpriteText bpmText = null!;
         private SpriteText svText = null!;
@@ -657,7 +684,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 // (Timing points F6, Distance snap Y, Convert slider to stream, Add BPM point, Add SV point).
                 // Sizes/positions are in design units, taken from the user's marked-up screenshot.
                 UI.MobileMetrics.IsMobile
-                    ? new Container
+                    ? phoneButtons = new Container
                     {
                         RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
@@ -7112,6 +7139,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Greet the user with the beta notice unless they've opted out.
             if (settings.ShowBetaPopup.Value)
                 betaOverlay.Show();
+
+            settings.PerfHidePart.Value = 0;
+            settings.PerfHidePart.BindValueChanged(e => applyPerfHide(e.NewValue));
 
             // Push the power-saving preference into the framework's global frame-sync, and keep it in sync.
             settings.PowerSaving.BindValueChanged(_ => applyFrameLimit(), true);
