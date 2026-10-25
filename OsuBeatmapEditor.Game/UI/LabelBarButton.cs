@@ -62,10 +62,16 @@ namespace OsuBeatmapEditor.Game.UI
                     },
                 },
             };
+
+            if (LiteInterface.Enabled)
+                LiteInterface.Flatten(content);
         }
 
         protected override bool OnHover(HoverEvent e)
         {
+            if (LiteInterface.Enabled)
+                return true;
+
             background.FadeColour(EditorTheme.Colours.ControlHover, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             text.FadeColour(EditorTheme.Colours.Text, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             return true;
@@ -73,18 +79,30 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override void OnHoverLost(HoverLostEvent e)
         {
+            if (LiteInterface.Enabled)
+                return;
+
             background.FadeColour(EditorTheme.Colours.Control, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             text.FadeColour(EditorTheme.Colours.TextMuted, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
         }
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            if (LiteInterface.Enabled)
+                return base.OnMouseDown(e);
+
             content.ScaleTo(0.92f, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             return base.OnMouseDown(e);
         }
 
         protected override void OnMouseUp(MouseUpEvent e)
         {
+            if (LiteInterface.Enabled)
+            {
+                base.OnMouseUp(e);
+                return;
+            }
+
             content.ScaleTo(1f, EditorTheme.Motion.Normal, Easing.OutBack);
             base.OnMouseUp(e);
         }

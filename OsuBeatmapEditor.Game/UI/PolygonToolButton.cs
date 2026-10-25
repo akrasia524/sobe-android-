@@ -34,6 +34,26 @@ namespace OsuBeatmapEditor.Game.UI
         [BackgroundDependencyLoader]
         private void load()
         {
+            if (LiteInterface.Enabled)
+            {
+                // Lite: just an icon (no gradient border, no five masked rings).
+                Child = content = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Child = new SpriteIcon
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Icon = FontAwesome.Solid.DrawPolygon,
+                        Size = new Vector2(34),
+                        Colour = new Color4(0xC4, 0x78, 0xD0, 0xFF),
+                    },
+                };
+                return;
+            }
+
             var pink = new Color4(0xFF, 0x80, 0x9B, 0xFF);
             var mid = new Color4(0xC4, 0x78, 0xD0, 0xFF);
             var violet = new Color4(0x8F, 0x70, 0xFF, 0xFF);
@@ -102,12 +122,21 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            if (LiteInterface.Enabled)
+                return base.OnMouseDown(e);
+
             content.ScaleTo(0.92f, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             return base.OnMouseDown(e);
         }
 
         protected override void OnMouseUp(MouseUpEvent e)
         {
+            if (LiteInterface.Enabled)
+            {
+                base.OnMouseUp(e);
+                return;
+            }
+
             content.ScaleTo(1f, EditorTheme.Motion.Normal, Easing.OutBack);
             base.OnMouseUp(e);
         }

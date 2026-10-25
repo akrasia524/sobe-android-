@@ -69,6 +69,9 @@ namespace OsuBeatmapEditor.Game.UI
                 },
             };
 
+            if (LiteInterface.Enabled)
+                LiteInterface.Flatten(content);
+
             active.BindValueChanged(_ => updateState(), true);
         }
 
@@ -76,7 +79,7 @@ namespace OsuBeatmapEditor.Game.UI
         {
             background.FadeColour(active.Value ? EditorTheme.Colours.Accent
                 : hovered ? EditorTheme.Colours.ControlHover : EditorTheme.Colours.Control, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
-            iconSprite.FadeColour(active.Value ? EditorTheme.Colours.Sunken
+            iconSprite.FadeColour(active.Value ? (LiteInterface.Enabled ? EditorTheme.Colours.Accent : EditorTheme.Colours.Sunken)
                 : hovered ? EditorTheme.Colours.Text : EditorTheme.Colours.TextMuted, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
         }
 
@@ -90,6 +93,9 @@ namespace OsuBeatmapEditor.Game.UI
         {
             hovered = true;
             updateState();
+            if (LiteInterface.Enabled)
+                return true;
+
             content.ScaleTo(1.1f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
             return true;
         }
@@ -98,17 +104,29 @@ namespace OsuBeatmapEditor.Game.UI
         {
             hovered = false;
             updateState();
+            if (LiteInterface.Enabled)
+                return;
+
             content.ScaleTo(1f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
         }
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            if (LiteInterface.Enabled)
+                return base.OnMouseDown(e);
+
             content.ScaleTo(0.88f, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             return base.OnMouseDown(e);
         }
 
         protected override void OnMouseUp(MouseUpEvent e)
         {
+            if (LiteInterface.Enabled)
+            {
+                base.OnMouseUp(e);
+                return;
+            }
+
             content.ScaleTo(IsHovered ? 1.1f : 1f, EditorTheme.Motion.Normal, Easing.OutBack);
             base.OnMouseUp(e);
         }

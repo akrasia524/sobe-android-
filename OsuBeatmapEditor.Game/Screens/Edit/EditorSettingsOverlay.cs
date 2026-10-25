@@ -122,6 +122,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                      + "which can raise the frame rate a lot on phones. Experimental: if the editor "
                                      + "ever glitches or crashes, switch this off."));
                 items.Add(divider());
+                items.Add(toggleRow("Lite interface (faster)", settings.LiteInterface));
+                items.Add(description("Draws the action buttons as just their icon or text - no filled shapes, outlines or press "
+                                     + "animation - so the editor has far less to draw. Takes effect after you re-open the map."));
+                items.Add(divider());
                 items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
                 items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "
                                      + "one every frame. Takes effect the next time you open a map. If a button ever looks "

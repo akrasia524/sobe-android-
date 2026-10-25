@@ -98,6 +98,9 @@ namespace OsuBeatmapEditor.Game.UI
                 },
             };
 
+            if (LiteInterface.Enabled)
+                LiteInterface.Flatten(content);
+
             refresh(force: true);
         }
 
@@ -184,12 +187,21 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            if (LiteInterface.Enabled)
+                return base.OnMouseDown(e);
+
             content.ScaleTo(0.92f, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             return base.OnMouseDown(e);
         }
 
         protected override void OnMouseUp(MouseUpEvent e)
         {
+            if (LiteInterface.Enabled)
+            {
+                base.OnMouseUp(e);
+                return;
+            }
+
             content.ScaleTo(1f, EditorTheme.Motion.Normal, Easing.OutBack);
             base.OnMouseUp(e);
         }

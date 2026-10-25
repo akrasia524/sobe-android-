@@ -126,6 +126,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public readonly BindableBool MultiThreaded = new BindableBool(false);
 
         /// <summary>Phone only: draw the action-button cluster as one cached picture instead of ~25 separate buttons every frame. Applies when a map is (re)opened.</summary>
+        /// <summary>Phone: "Lite interface" - controls drawn as icon/text only (no shapes, outlines or press animation). Applies when a map is (re)opened.</summary>
+        public readonly BindableBool LiteInterface = new BindableBool(false);
+
         public readonly BindableBool CacheButtons = new BindableBool(false);
 
         /// <summary>
@@ -307,6 +310,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             PowerSaving.ValueChanged += _ => save();
             MultiThreaded.ValueChanged += _ => save();
             CacheButtons.ValueChanged += _ => save();
+            LiteInterface.ValueChanged += _ => save();
             AutoKeyOverlay.ValueChanged += _ => save();
             AutoHumanize.ValueChanged += _ => save();
             ReviewShowAlways.ValueChanged += _ => save();
@@ -389,6 +393,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 if (data.TryGetValue("cacheButtons", out string? cb) && bool.TryParse(cb, out bool cbValue))
                     CacheButtons.Value = cbValue;
 
+                if (data.TryGetValue("liteInterface", out string? lite) && bool.TryParse(lite, out bool liteValue))
+                    LiteInterface.Value = liteValue;
+
                 if (data.TryGetValue("autoKeyOverlay", out string? keyOverlay) && bool.TryParse(keyOverlay, out bool keyOverlayValue))
                     AutoKeyOverlay.Value = keyOverlayValue;
 
@@ -468,6 +475,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["powerSaving"] = PowerSaving.Value.ToString();
                 data["multiThreaded"] = MultiThreaded.Value.ToString();
                 data["cacheButtons"] = CacheButtons.Value.ToString();
+                data["liteInterface"] = LiteInterface.Value.ToString();
                 data["autoKeyOverlay"] = AutoKeyOverlay.Value.ToString();
                 data["autoHumanize"] = AutoHumanize.Value.ToString();
                 data["hideTooltips"] = HideTooltips.Value.ToString();

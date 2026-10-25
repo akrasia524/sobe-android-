@@ -79,6 +79,9 @@ namespace OsuBeatmapEditor.Game.UI
                     },
                 },
             };
+
+            if (LiteInterface.Enabled)
+                LiteInterface.Flatten(content);
         }
 
         protected override void Update()
@@ -99,6 +102,9 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override bool OnHover(HoverEvent e)
         {
+            if (LiteInterface.Enabled)
+                return true;
+
             background.FadeColour(EditorTheme.Colours.ControlHover, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             if (!highlighted) iconSprite.FadeColour(EditorTheme.Colours.Text, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             content.ScaleTo(1.1f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
@@ -107,6 +113,9 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override void OnHoverLost(HoverLostEvent e)
         {
+            if (LiteInterface.Enabled)
+                return;
+
             background.FadeColour(EditorTheme.Colours.Control, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             if (!highlighted) iconSprite.FadeColour(EditorTheme.Colours.TextMuted, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             content.ScaleTo(1f, EditorTheme.Motion.Normal, EditorTheme.Motion.Ease);
@@ -114,12 +123,21 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            if (LiteInterface.Enabled)
+                return base.OnMouseDown(e);
+
             content.ScaleTo(0.88f, EditorTheme.Motion.Fast, EditorTheme.Motion.Ease);
             return base.OnMouseDown(e);
         }
 
         protected override void OnMouseUp(MouseUpEvent e)
         {
+            if (LiteInterface.Enabled)
+            {
+                base.OnMouseUp(e);
+                return;
+            }
+
             content.ScaleTo(IsHovered ? 1.1f : 1f, EditorTheme.Motion.Normal, Easing.OutBack);
             base.OnMouseUp(e);
         }
