@@ -12,7 +12,10 @@ namespace OsuBeatmapEditor.Game.UI
     /// </summary>
     public static class LiteInterface
     {
-        public static bool Enabled { get; set; }
+        /// <summary>The "Lite interface" switch (set once at startup, phone only). Enabled reads it live, so it can never go out of step with the setting.</summary>
+        public static osu.Framework.Bindables.BindableBool? Source { get; set; }
+
+        public static bool Enabled => Source?.Value ?? false;
 
         /// <summary>Strips a control's chrome: no rounded masking, no outline, and its filled background boxes are hidden.</summary>
         public static void Flatten(Container content)

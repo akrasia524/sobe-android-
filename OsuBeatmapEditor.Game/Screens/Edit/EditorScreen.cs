@@ -289,6 +289,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private bool hudHidden;
         private Container hudLayer = null!;
         private Container? phoneButtons;
+        private double hudRestoredAt = double.MinValue;
+        private bool lastHudHidden;
         private Container? phoneButtonsHost;
         private readonly System.Collections.Generic.List<(Drawable drawable, float alpha)> perfHidden = new System.Collections.Generic.List<(Drawable, float)>();
 
@@ -2226,6 +2228,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Hidden HUD: collapse the reserved bars to a small inset so the playfield recentres and grows slightly.
             if (hudHidden)
                 target = hidden_bar_inset;
+
+            // Hiding / showing the interface resizes the playfield; easing that over many frames re-lays-out every slider each
+            // frame (visible as a 1-2 s lag on busy maps), so on a hide/show change the bars jump straight to their size.
+            if (hudHidden != lastHudHidden)
+            {
+                lastHudHidden = hudHidden;
+                topHeightCurrent = target;
+                bottomHeightCurrent = hudHidden ? hidden_bar_inset : bottom_bar_height;
+            }
 
             if (Math.Abs(topHeightCurrent - target) < 0.5f)
                 topHeightCurrent = target;
@@ -7248,8 +7259,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 // Escape backs out: with the interface hidden (eye button), first bring it back (phones: the Back button); otherwise
                 // cancel an in-progress slider/spinner placement, then placement tools, selection, exit.
+                // After restoring the interface, further Back presses are ignored for a moment: the layout can take a second to
+                // settle on a busy map, and a second tap meant for "restore" must not exit the editor.
+                if (Time.Current - hudRestoredAt < 1500)
+                    return true;
+
                 if (hudHidden)
+                {
                     toggleHud();
+                    hudRestoredAt = Time.Current;
+                }
                 else if (playfield.BuildingSlider)
                     playfield.CancelSliderBuild();
                 else if (spinnerBuilding)
