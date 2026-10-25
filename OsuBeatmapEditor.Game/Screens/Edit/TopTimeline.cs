@@ -187,6 +187,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // Per slider, its selectable node circles keyed by node index (0 = head, Slides = tail), for red node selection.
         private readonly Dictionary<int, Dictionary<int, CircularContainer>> sliderNodeCircles = new Dictionary<int, Dictionary<int, CircularContainer>>();
         // Per slider, its body bar plus the colour it rests at, so a body-part selection can tint it yellow.
+        // Lite interface: the flat bars that stand in for an object's circles, with the colour each rests at.
+        private readonly Dictionary<int, List<(Box Bar, Color4 RestColour)>> liteBars = new Dictionary<int, List<(Box, Color4)>>();
+
         private readonly Dictionary<int, (Drawable Bar, Color4 RestColour)> sliderBars = new Dictionary<int, (Drawable, Color4)>();
         private Box? dragBox;
         private double dragStartTime;
@@ -593,6 +596,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             blueprintCircles.Clear();
             sliderNodeCircles.Clear();
             sliderBars.Clear();
+            liteBars.Clear();
             realizedIds.Clear();
             objectCells.Clear();
             for (int i = 0; i < 3; i++)
@@ -641,6 +645,66 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             };
 
             var circles = new List<CircularContainer>();
+
+            if (OsuBeatmapEditor.Game.UI.LiteInterface.Enabled)
+            {
+                // Lite interface: plain flat rectangles in the combo colour (no circles, outlines or numbers) - far fewer draw commands.
+                var bars = new List<(Box Bar, Color4 RestColour)>();
+
+                void flat(float dx, float width, float height, Color4 colour, Anchor origin = Anchor.Centre)
+                {
+                    var box = new Box
+                    {
+                        Anchor = Anchor.TopLeft,
+                        Origin = origin,
+                        X = dx,
+                        Y = object_centre_y,
+                        Width = width,
+                        Height = height,
+                        Colour = colour,
+                    };
+                    blueprint.Add(box);
+                    bars.Add((box, colour));
+                }
+
+                float length = (float)(o.Duration * pixelsPerMs);
+                Color4 muted = OsuColour.TextMuted;
+                Color4 bodyColour = new Color4(combo.R, combo.G, combo.B, 0.6f);
+
+                switch (o.Kind)
+                {
+                    case HitObjectKind.Slider:
+                        flat(0, length, 4, bodyColour, Anchor.CentreLeft);                                    // body line
+                        for (int k = 1; k < o.Slides; k++)
+                            flat(length * k / o.Slides, 3, object_size * 0.7f, Color4.White);                // reverse ticks
+                        flat(length, 4, object_size * 0.7f, combo);                                          // tail
+                        flat(0, 6, object_size, combo);                                                      // head, on top
+                        break;
+
+                    case HitObjectKind.Spinner:
+                        flat(0, length, 4, muted, Anchor.CentreLeft);
+                        flat(length, 4, object_size * 0.7f, muted);
+                        flat(0, 4, object_size * 0.7f, muted);
+                        break;
+
+                    default:
+                        flat(0, 6, object_size, combo);
+                        break;
+                }
+
+                liteBars[o.Id] = bars;
+                blueprintCircles[o.Id] = circles;
+                objectLayer.Add(blueprint);
+                blueprints[o.Id] = blueprint;
+                blueprintBaseX[o.Id] = x;
+                realizedIds.Add(o.Id);
+
+                applyObjectSelectionVisual(o.Id);
+
+                if (hitsoundMode.Value)
+                    realizeCells(o);
+                return;
+            }
 
             CircularContainer addDot(float dx, Color4 colour, int? comboNumber)
             {
@@ -715,6 +779,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             blueprintCircles.Remove(id);
             sliderNodeCircles.Remove(id);
             sliderBars.Remove(id);
+            liteBars.Remove(id);
 
             if (objectCells.Remove(id, out var cells))
             {
@@ -2061,6 +2126,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             return true;
         }
 
+        /// <summary>The slider's slide count (its tail node index); 1 if the object isn't found.</summary>
+        private int slidesOf(int id)
+        {
+            foreach (var h in beatmap.HitObjects)
+            {
+                if (h.Id == id)
+                    return Math.Max(1, h.Slides);
+            }
+
+            return 1;
+        }
+
         /// <summary>Whether the object with the given id is a slider.</summary>
         private bool isSlider(int id)
         {
@@ -2087,7 +2164,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 if (nearTail && (!nearHead || Math.Abs(time - b.EndTime) < Math.Abs(time - b.StartTime)))
                 {
-                    nodeIndex = sliderNodeCircles.TryGetValue(id, out var nodes) ? nodes.Keys.Max() : 1;
+                    nodeIndex = sliderNodeCircles.TryGetValue(id, out var nodes) ? nodes.Keys.Max() : slidesOf(id);
                     return true;
                 }
 
@@ -2409,6 +2486,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Applies the selection visual (circle borders, red node, yellow body tint) to one realised object.</summary>
         private void applyObjectSelectionVisual(int id)
         {
+            if (liteBars.TryGetValue(id, out var lite))
+            {
+                bool liteSel = selection.Contains(id);
+                foreach (var (bar, rest) in lite)
+                    bar.Colour = liteSel ? OsuColour.Yellow : rest;
+            }
+
             if (blueprintCircles.TryGetValue(id, out var circles))
             {
                 bool sel = selection.Contains(id);
