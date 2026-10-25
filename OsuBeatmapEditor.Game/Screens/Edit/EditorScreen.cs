@@ -7246,9 +7246,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             if (settings.ExitKey.Value.Matches(e))
             {
-                // Escape backs out: cancel an in-progress slider/spinner placement, then placement tools,
-                // selection, exit.
-                if (playfield.BuildingSlider)
+                // Escape backs out: with the interface hidden (eye button), first bring it back (phones: the Back button); otherwise
+                // cancel an in-progress slider/spinner placement, then placement tools, selection, exit.
+                if (hudHidden)
+                    toggleHud();
+                else if (playfield.BuildingSlider)
                     playfield.CancelSliderBuild();
                 else if (spinnerBuilding)
                     playfield.CancelSpinnerBuild();
