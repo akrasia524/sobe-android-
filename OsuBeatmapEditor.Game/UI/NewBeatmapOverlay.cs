@@ -35,6 +35,8 @@ namespace OsuBeatmapEditor.Game.UI
         private FormField creatorField = null!;
         private FormField difficultyField = null!;
         private FormField bpmField = null!;
+        private FormField offsetField = null!;
+        private FormField meterField = null!;
         private BasicFileSelector? fileSelector;
 
         /// <summary>
@@ -192,12 +194,39 @@ namespace OsuBeatmapEditor.Game.UI
                             titleField = new FormField("Title"),
                             creatorField = new FormField("Creator"),
                             difficultyField = new FormField("Difficulty name", "Normal"),
-                            bpmField = new FormField("BPM", "120"),
+                            buildTimingRow(),
                         },
                     },
                     null,
                     // Right column: audio track selection.
                     buildAudioColumn(),
+                },
+            },
+        };
+
+        /// <summary>BPM, the first beat's offset (ms) and the beats per bar, side by side so the left column keeps its height.</summary>
+        private Drawable buildTimingRow() => new GridContainer
+        {
+            RelativeSizeAxes = Axes.X,
+            AutoSizeAxes = Axes.Y,
+            ColumnDimensions = new[]
+            {
+                new Dimension(GridSizeMode.Relative, 0.38f),
+                new Dimension(GridSizeMode.Absolute, EditorTheme.Spacing.Sm),
+                new Dimension(GridSizeMode.Relative, 0.34f),
+                new Dimension(GridSizeMode.Absolute, EditorTheme.Spacing.Sm),
+                new Dimension(),
+            },
+            RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+            Content = new[]
+            {
+                new Drawable?[]
+                {
+                    bpmField = new FormField("BPM", "120"),
+                    null,
+                    offsetField = new FormField("Offset (ms)", "0"),
+                    null,
+                    meterField = new FormField("Beats/bar", "4"),
                 },
             },
         };
@@ -579,6 +608,8 @@ namespace OsuBeatmapEditor.Game.UI
             creatorField.Current.Value = string.Empty;
             difficultyField.Current.Value = "Normal";
             bpmField.Current.Value = "120";
+            offsetField.Current.Value = "0";
+            meterField.Current.Value = "4";
 
             audioPath = null;
             seededAudioFileName = null;
@@ -687,6 +718,8 @@ namespace OsuBeatmapEditor.Game.UI
             Creator = creatorField.Current.Value.Trim(),
             DifficultyName = string.IsNullOrWhiteSpace(difficultyField.Current.Value) ? "Normal" : difficultyField.Current.Value.Trim(),
             Bpm = double.TryParse(bpmField.Current.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double bpm) ? bpm : 0,
+            Offset = double.TryParse(offsetField.Current.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double offset) ? offset : 0,
+            Meter = int.TryParse(meterField.Current.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int meter) ? System.Math.Clamp(meter, 1, 16) : 4,
             AudioPath = audioPath ?? string.Empty,
             AudioFileName = seededAudioFileName,
             TimingPointLines = seededTimingLines,

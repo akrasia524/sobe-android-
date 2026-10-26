@@ -156,7 +156,9 @@ namespace OsuBeatmapEditor.Game.Beatmaps
             else
             {
                 // time,beatLength,meter,sampleSet,sampleIndex,volume,uninherited,effects
-                sb.Append($"0,{bl},4,1,0,100,1,0\n\n");
+                string offset = Math.Round(request.Offset).ToString("0", CultureInfo.InvariantCulture);
+                int meter = Math.Clamp(request.Meter, 1, 16);
+                sb.Append($"{offset},{bl},{meter},1,0,100,1,0\n\n");
             }
 
             sb.Append("[HitObjects]\n");

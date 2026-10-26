@@ -14,6 +14,12 @@ namespace OsuBeatmapEditor.Game.Beatmaps
         public string DifficultyName { get; set; } = "Normal";
         public double Bpm { get; set; } = 120;
 
+        /// <summary>Time (ms) of the first beat - where the first (red) timing point sits. 0 by default.</summary>
+        public double Offset { get; set; }
+
+        /// <summary>Beats per bar (the time signature's top number, e.g. 4 for 4/4). Clamped to 1-16 when written.</summary>
+        public int Meter { get; set; } = 4;
+
         /// <summary>Absolute path to the source audio file chosen by the user.</summary>
         public string AudioPath { get; set; } = string.Empty;
 
