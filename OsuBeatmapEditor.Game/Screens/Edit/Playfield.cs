@@ -1680,11 +1680,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             // Lines parallel to the grid's y axis (one per step along x) ...
             for (int k = kMinU; k <= kMaxU; k++)
-                gridContainer.Add(gridLine(origin + u * (k * size), rotation, vertical: true, length, centre: k == 0));
+                gridContainer.Add(gridLine(origin + u * (k * size), rotation, vertical: true, length, centreLine: k == 0));
 
             // ... and lines parallel to its x axis (one per step along y).
             for (int k = kMinV; k <= kMaxV; k++)
-                gridContainer.Add(gridLine(origin + v * (k * size), rotation, vertical: false, length, centre: k == 0));
+                gridContainer.Add(gridLine(origin + v * (k * size), rotation, vertical: false, length, centreLine: k == 0));
         }
 
         private static (int min, int max) lineRange(Vector2 origin, Vector2 axis, float size)
