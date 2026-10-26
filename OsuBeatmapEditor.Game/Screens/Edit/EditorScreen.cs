@@ -3855,7 +3855,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             {
                 // Grid snap wins over magnetic: shift the delta so the grabbed object lands exactly on a grid point
                 // (the rest of the selection moves rigidly with it).
-                delta = snapToGrid(anchor + delta, playfield.CurrentGridSize) - anchor;
+                delta = playfield.SnapToGrid(anchor + delta) - anchor;
             }
             else
             {
@@ -3898,7 +3898,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
             // Grid snap takes over placement entirely: the cursor locks to the nearest grid intersection.
             if (gridSnapEnabled && playfield.CurrentGridSize > 0)
-                return snapToGrid(cursor, playfield.CurrentGridSize);
+                return playfield.SnapToGrid(cursor);
 
             Vector2 pos = cursor;
             if (distanceSnapEnabled)
@@ -3917,17 +3917,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Grid-snaps a position when grid snap is on and the grid is visible; otherwise returns it unchanged.
         /// Shared by placement, slider anchors and control-point handles so the whole slider follows the grid.</summary>
         private Vector2 GridSnapPosition(Vector2 osuPos)
-            => gridSnapEnabled && playfield.CurrentGridSize > 0 ? snapToGrid(osuPos, playfield.CurrentGridSize) : osuPos;
-
-        /// <summary>Snaps a position to the nearest intersection of the centred visual grid (spacing <paramref name="size"/> osu!px).</summary>
-        private static Vector2 snapToGrid(Vector2 pos, float size)
-        {
-            const float cx = ParsedBeatmap.PLAYFIELD_WIDTH / 2f;  // the grid is drawn outward from the playfield centre
-            const float cy = ParsedBeatmap.PLAYFIELD_HEIGHT / 2f;
-            return new Vector2(
-                cx + (float)Math.Round((pos.X - cx) / size) * size,
-                cy + (float)Math.Round((pos.Y - cy) / size) * size);
-        }
+            => gridSnapEnabled && playfield.CurrentGridSize > 0 ? playfield.SnapToGrid(osuPos) : osuPos;
 
         /// <summary>True while the Shift-held spacing-guide mode should be engaged (Shift down during placement).</summary>
         private bool spacingGuideHeld() => GetContainingInputManager()?.CurrentState.Keyboard.ShiftPressed == true;

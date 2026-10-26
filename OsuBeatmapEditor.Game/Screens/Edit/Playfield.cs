@@ -90,8 +90,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private HashSet<int> boxSelected = new HashSet<int>();
 
         // Grid sizes (osu!pixels) cycled by the G key, matching osu!lazer's editor; 0 = grid off.
-        private static readonly float[] grid_sizes = { 4f, 8f, 16f, 32f, 0f };
-        private int gridSizeIndex = 2; // default to 16px, like lazer
+        /// <summary>The snapping grid (spacing / rotation / origin / visibility); changing any of it redraws the grid.</summary>
+        public readonly GridSettings Grid = new GridSettings();
 
         private readonly Container playArea;
         private Container gridContainer = null!;
@@ -259,7 +259,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                         Alpha = 0.6f,
                     },
                     // Snapping grid (toggled / resized with G), behind everything else.
-                    gridContainer = new Container { RelativeSizeAxes = Axes.Both },
+                    gridContainer = new Container { RelativeSizeAxes = Axes.Both, Masking = true },
                     playfieldBorder = new Container
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -304,6 +304,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             };
 
             buildGrid();
+
+            // Redraw the grid when any of its settings change (AddOnce: a dragged slider changes it every frame, but it is redrawn once per frame at most).
+            Grid.Spacing.ValueChanged += _ => Scheduler.AddOnce(buildGrid);
+            Grid.Rotation.ValueChanged += _ => Scheduler.AddOnce(buildGrid);
+            Grid.OriginX.ValueChanged += _ => Scheduler.AddOnce(buildGrid);
+            Grid.OriginY.ValueChanged += _ => Scheduler.AddOnce(buildGrid);
+            Grid.Visible.ValueChanged += _ => Scheduler.AddOnce(buildGrid);
         }
 
         [BackgroundDependencyLoader]
@@ -1632,52 +1639,69 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             selection.SetRange(boxSelected);
         }
 
-        /// <summary>Advances to the next grid size (G key), wrapping back to the start.</summary>
-        public void CycleGridSize()
-        {
-            gridSizeIndex = (gridSizeIndex + 1) % grid_sizes.Length;
-            buildGrid();
-        }
+        /// <summary>Advances to the next grid spacing preset (G key): 4, 8, 16, 32, hidden, then round again.</summary>
+        public void CycleGridSize() => Grid.CyclePreset();
 
-        /// <summary>Current grid spacing in osu!pixels, or 0 when the grid is off. Used by grid snapping.</summary>
-        public float CurrentGridSize => grid_sizes[gridSizeIndex];
+        /// <summary>Current grid spacing in osu!pixels, or 0 when the grid is hidden. Used by grid snapping.</summary>
+        public float CurrentGridSize => Grid.Visible.Value ? Grid.Spacing.Value : 0f;
 
-        /// <summary>Turns the grid on at the default spacing if it's currently off (so grid snap has something to snap to).</summary>
+        /// <summary>Snaps a playfield position to the nearest grid intersection (honours the grid's rotation and origin).</summary>
+        public Vector2 SnapToGrid(Vector2 position) => Grid.Snap(position);
+
+        /// <summary>Shows the grid if it is hidden (so grid snap has something to snap to).</summary>
         public void EnsureGridVisible()
         {
-            if (grid_sizes[gridSizeIndex] == 0)
-            {
-                gridSizeIndex = 2; // 16px, the default
-                buildGrid();
-            }
+            if (!Grid.Visible.Value)
+                Grid.Visible.Value = true;
         }
 
         private void buildGrid()
         {
             gridContainer.Clear();
 
-            float size = grid_sizes[gridSizeIndex];
+            if (!Grid.Visible.Value)
+                return;
+
+            float size = Grid.Spacing.Value;
             if (size <= 0)
                 return;
 
-            float centreX = ParsedBeatmap.PLAYFIELD_WIDTH / 2f;
-            float centreY = ParsedBeatmap.PLAYFIELD_HEIGHT / 2f;
+            float rotation = Grid.Rotation.Value;
+            double a = rotation * Math.PI / 180.0;
+            var u = new Vector2((float)Math.Cos(a), (float)Math.Sin(a));   // the grid's x axis
+            var v = new Vector2(-(float)Math.Sin(a), (float)Math.Cos(a));  // the grid's y axis
+            Vector2 origin = Grid.Origin;
 
-            // Vertical lines, stepping out from the playfield centre in both directions.
-            for (float x = centreX; x <= ParsedBeatmap.PLAYFIELD_WIDTH; x += size)
+            // Which grid lines can touch the playfield: project its four corners onto each axis.
+            (int kMinU, int kMaxU) = lineRange(origin, u, size);
+            (int kMinV, int kMaxV) = lineRange(origin, v, size);
+
+            const float length = 1400f; // longer than the playfield's diagonal; the container masks the excess
+
+            // Lines parallel to the grid's y axis (one per step along x) ...
+            for (int k = kMinU; k <= kMaxU; k++)
+                gridContainer.Add(gridLine(origin + u * (k * size), rotation, vertical: true, length, centre: k == 0));
+
+            // ... and lines parallel to its x axis (one per step along y).
+            for (int k = kMinV; k <= kMaxV; k++)
+                gridContainer.Add(gridLine(origin + v * (k * size), rotation, vertical: false, length, centre: k == 0));
+        }
+
+        private static (int min, int max) lineRange(Vector2 origin, Vector2 axis, float size)
+        {
+            float lo = float.MaxValue, hi = float.MinValue;
+            foreach (var corner in new[]
             {
-                gridContainer.Add(gridLine(x, vertical: true, centre: x == centreX, gridColour(x == centreX)));
-                if (x != centreX)
-                    gridContainer.Add(gridLine(centreX - (x - centreX), vertical: true, centre: false, gridColour(false)));
+                new Vector2(0, 0), new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH, 0),
+                new Vector2(0, ParsedBeatmap.PLAYFIELD_HEIGHT), new Vector2(ParsedBeatmap.PLAYFIELD_WIDTH, ParsedBeatmap.PLAYFIELD_HEIGHT),
+            })
+            {
+                float d = Vector2.Dot(corner - origin, axis);
+                lo = Math.Min(lo, d);
+                hi = Math.Max(hi, d);
             }
 
-            // Horizontal lines.
-            for (float y = centreY; y <= ParsedBeatmap.PLAYFIELD_HEIGHT; y += size)
-            {
-                gridContainer.Add(gridLine(y, vertical: false, centre: y == centreY, gridColour(y == centreY)));
-                if (y != centreY)
-                    gridContainer.Add(gridLine(centreY - (y - centreY), vertical: false, centre: false, gridColour(false)));
-            }
+            return ((int)Math.Floor(lo / size), (int)Math.Ceiling(hi / size));
         }
 
         /// <summary>The grid-line colour: neutral white normally, reddish while in Review mode. Centre lines are stronger.</summary>
@@ -1685,16 +1709,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             ? new Color4(1f, 0.36f, 0.33f, centre ? 0.36f : 0.18f)
             : new Color4(1f, 1f, 1f, centre ? 0.22f : 0.1f);
 
-        private static Drawable gridLine(float position, bool vertical, bool centre, Color4 colour) => new Box
+        private Drawable gridLine(Vector2 centre, float rotation, bool vertical, float length, bool centreLine) => new Box
         {
             Anchor = Anchor.TopLeft,
-            Origin = vertical ? Anchor.TopCentre : Anchor.CentreLeft,
-            RelativeSizeAxes = vertical ? Axes.Y : Axes.X,
-            Width = vertical ? (centre ? 2f : 1f) : 1f,
-            Height = vertical ? 1f : (centre ? 2f : 1f),
-            X = vertical ? position : 0,
-            Y = vertical ? 0 : position,
-            Colour = colour,
+            Origin = Anchor.Centre,
+            Position = centre,
+            Rotation = rotation,
+            Width = vertical ? (centreLine ? 2f : 1f) : length,
+            Height = vertical ? length : (centreLine ? 2f : 1f),
+            Colour = gridColour(centreLine),
         };
 
         /// <summary>Arms or disarms the circle-placement tool, clearing the selection when arming.</summary>
