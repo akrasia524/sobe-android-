@@ -196,6 +196,16 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // Grid snapping (T): when on, placement snaps to the nearest visual-grid intersection.
         private bool gridSnapEnabled;
 
+        /// <summary>Toggles grid snapping (the T shortcut and the phone Grid snap button). Turning it on shows the grid if it was hidden.</summary>
+        private void toggleGridSnap()
+        {
+            gridSnapEnabled = !gridSnapEnabled;
+            if (gridSnapEnabled)
+                playfield.EnsureGridVisible();
+            toasts?.Push(gridSnapEnabled ? $"Grid snap on ({playfield.CurrentGridSize:0}px)" : "Grid snap off",
+                gridSnapEnabled ? EditorTheme.Colours.Success : EditorTheme.Colours.TextMuted);
+        }
+
         /// <summary>An undo snapshot of the editable map state (objects + timing points).</summary>
         private sealed record Snapshot(List<HitObjectModel> Objects, List<TimingPointModel> TimingPoints, List<Annotations.Annotation> Annotations);
 
@@ -712,6 +722,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 Position = new Vector2(100, 93),
                                 IconSize = 28,
                                 AccentBorder = true,
+                            },
+                            new UI.GridSnapButton(toggleGridSnap, () => gridSnapEnabled)
+                            {
+                                Anchor = Anchor.TopLeft,
+                                Origin = Anchor.TopLeft,
+                                Position = new Vector2(163, 84),
+                                Size = new Vector2(80),
                             },
                             new UI.TimelineModeButton(timelineScroll)
                             {
@@ -7529,11 +7546,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             // Toggle grid snapping (default T). Turning it on shows the grid if it was hidden, so there's a grid to snap to.
             if (settings.GridSnapKey.Value.Matches(e) && !e.Repeat)
             {
-                gridSnapEnabled = !gridSnapEnabled;
-                if (gridSnapEnabled)
-                    playfield.EnsureGridVisible();
-                toasts?.Push(gridSnapEnabled ? $"Grid snap on ({playfield.CurrentGridSize:0}px)" : "Grid snap off",
-                    gridSnapEnabled ? EditorTheme.Colours.Success : EditorTheme.Colours.TextMuted);
+                toggleGridSnap();
                 return true;
             }
 
