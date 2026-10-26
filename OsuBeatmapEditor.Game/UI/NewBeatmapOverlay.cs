@@ -36,6 +36,7 @@ namespace OsuBeatmapEditor.Game.UI
         private FormField difficultyField = null!;
         private FormField bpmField = null!;
         private FormField offsetField = null!;
+        private TimingHelperOverlay timingHelper = null!;
         private FormField meterField = null!;
         private BasicFileSelector? fileSelector;
 
@@ -127,6 +128,7 @@ namespace OsuBeatmapEditor.Game.UI
                         },
                     },
                 },
+                timingHelper = new TimingHelperOverlay { Applied = applyTimingFromHelper },
             };
 
             createButton.Enabled.Value = false;
@@ -701,6 +703,11 @@ namespace OsuBeatmapEditor.Game.UI
                             Size = new Vector2(120, 44),
                             Action = () => Hide(),
                         },
+                        new OsuButton("Tap BPM...", OsuColour.Surface)
+                        {
+                            Size = new Vector2(150, 44),
+                            Action = openTimingHelper,
+                        },
                         createButton = new OsuButton("Create", OsuColour.Pink)
                         {
                             Size = new Vector2(150, 44),
@@ -710,6 +717,28 @@ namespace OsuBeatmapEditor.Game.UI
                 },
             },
         };
+
+        /// <summary>Opens the tap-along helper for the chosen audio (needs an audio file first).</summary>
+        private void openTimingHelper()
+        {
+            if (audioPath == null || !File.Exists(audioPath))
+            {
+                showStatus("Choose an audio file first, then tap along to find the BPM.", true);
+                return;
+            }
+
+            double? currentBpm = double.TryParse(bpmField.Current.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double b) && b > 0 ? b : null;
+            double? currentOffset = double.TryParse(offsetField.Current.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double o) ? o : null;
+            timingHelper.ShowFor(audioPath, currentBpm, currentOffset);
+        }
+
+        private void applyTimingFromHelper(double? bpm, double? offset)
+        {
+            if (bpm is double b && b > 0)
+                bpmField.Current.Value = b.ToString("0.###", CultureInfo.InvariantCulture);
+            if (offset is double o)
+                offsetField.Current.Value = o.ToString("0", CultureInfo.InvariantCulture);
+        }
 
         private NewBeatmapRequest buildRequest() => new NewBeatmapRequest
         {
