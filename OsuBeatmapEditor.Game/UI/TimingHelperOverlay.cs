@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Input.Events;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using OsuBeatmapEditor.Game.Graphics;
@@ -276,6 +277,12 @@ namespace OsuBeatmapEditor.Game.UI
         {
             releaseTrack();
             base.Dispose(isDisposing);
+        }
+
+        private partial class ClickBlockingContainer : Container
+        {
+            protected override bool OnClick(ClickEvent e) => true;
+            protected override bool OnMouseDown(MouseDownEvent e) => true;
         }
     }
 }
