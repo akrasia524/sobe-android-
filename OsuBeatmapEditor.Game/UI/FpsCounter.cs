@@ -15,18 +15,26 @@ namespace OsuBeatmapEditor.Game.UI
         private SpriteText text = null!;
 
         [osu.Framework.Allocation.Resolved]
+        private OsuBeatmapEditor.Game.Screens.Edit.EditorSettings settings { get; set; } = null!;
+
+        [osu.Framework.Allocation.Resolved]
         private osu.Framework.Platform.GameHost host { get; set; } = null!;
         private double averageFrameTime;
         private double sinceTextUpdate;
 
-        public osu.Framework.Localisation.LocalisableString TooltipText => "Tap to show / cycle the performance details (frame times)";
+        public osu.Framework.Localisation.LocalisableString TooltipText => "Frames per second (the performance details on tap can be turned on in Settings > Performance)";
 
         public FpsCounter()
         {
             AutoSizeAxes = Axes.Both;
             Masking = true;
             CornerRadius = 5;
-            Action = () => OsuBeatmapEditorGameBase.CyclePerformanceOverlay?.Invoke();
+            // Does nothing unless "Tap FPS counter for performance details" is on in Settings > Performance.
+            Action = () =>
+            {
+                if (settings.PerfDetailsOnTap.Value)
+                    OsuBeatmapEditorGameBase.CyclePerformanceOverlay?.Invoke();
+            };
         }
 
         protected override void LoadComplete()

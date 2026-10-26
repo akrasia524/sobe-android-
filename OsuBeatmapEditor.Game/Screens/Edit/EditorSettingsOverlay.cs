@@ -133,6 +133,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
 
             items.Add(divider());
+            items.Add(toggleRow("Tap FPS counter for performance details", settings.PerfDetailsOnTap));
+            items.Add(description("When on, tapping the FPS counter in the editor shows the frame-time graphs. Off by default so an "
+                                 + "accidental tap does nothing; turning it off also closes the graphs if they are open."));
+            settings.PerfDetailsOnTap.BindValueChanged(e =>
+            {
+                if (!e.NewValue)
+                    OsuBeatmapEditorGameBase.HidePerformanceOverlay?.Invoke();
+            });
+            items.Add(divider());
             items.Add(description("Diagnostic: temporarily hides one part of the editor so you can read the FPS counter and see what "
                                  + "that part costs. It resets when you leave the editor."));
             var hideButton = new OsuButton("Hide: nothing", OsuColour.Surface) { Size = new Vector2(260, 36) };

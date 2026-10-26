@@ -22,10 +22,28 @@ namespace OsuBeatmapEditor.Game
         /// </summary>
         public static System.Action? CyclePerformanceOverlay { get; private set; }
 
+        /// <summary>Closes the performance overlay if it is open (cycles it round to "off").</summary>
+        public static System.Action? HidePerformanceOverlay { get; private set; }
+
+        // Where the overlay is in its three-step cycle (0 = off, 1 = frame times, 2 = frame times + threads/GC).
+        private static int overlayStep;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            CyclePerformanceOverlay = CycleFrameStatistics;
+            CyclePerformanceOverlay = () =>
+            {
+                CycleFrameStatistics();
+                overlayStep = (overlayStep + 1) % 3;
+            };
+            HidePerformanceOverlay = () =>
+            {
+                while (overlayStep != 0)
+                {
+                    CycleFrameStatistics();
+                    overlayStep = (overlayStep + 1) % 3;
+                }
+            };
         }
 
         protected OsuBeatmapEditorGameBase()

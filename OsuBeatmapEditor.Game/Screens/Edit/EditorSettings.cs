@@ -129,6 +129,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <summary>Phone: "Lite interface" - controls drawn as icon/text only (no shapes, outlines or press animation). Applies when a map is (re)opened.</summary>
         public readonly BindableBool LiteInterface = new BindableBool(false);
 
+        /// <summary>Whether tapping the FPS counter opens the framework's performance overlay. Off by default so an accidental tap does nothing.</summary>
+        public readonly BindableBool PerfDetailsOnTap = new BindableBool(false);
+
         public readonly BindableBool CacheButtons = new BindableBool(false);
 
         /// <summary>
@@ -310,6 +313,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             PowerSaving.ValueChanged += _ => save();
             MultiThreaded.ValueChanged += _ => save();
             CacheButtons.ValueChanged += _ => save();
+            PerfDetailsOnTap.ValueChanged += _ => save();
             LiteInterface.ValueChanged += _ => save();
             AutoKeyOverlay.ValueChanged += _ => save();
             AutoHumanize.ValueChanged += _ => save();
@@ -396,6 +400,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 if (data.TryGetValue("liteInterface", out string? lite) && bool.TryParse(lite, out bool liteValue))
                     LiteInterface.Value = liteValue;
 
+                if (data.TryGetValue("perfDetailsOnTap", out string? pdt) && bool.TryParse(pdt, out bool pdtValue))
+                    PerfDetailsOnTap.Value = pdtValue;
+
                 if (data.TryGetValue("autoKeyOverlay", out string? keyOverlay) && bool.TryParse(keyOverlay, out bool keyOverlayValue))
                     AutoKeyOverlay.Value = keyOverlayValue;
 
@@ -476,6 +483,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["multiThreaded"] = MultiThreaded.Value.ToString();
                 data["cacheButtons"] = CacheButtons.Value.ToString();
                 data["liteInterface"] = LiteInterface.Value.ToString();
+                data["perfDetailsOnTap"] = PerfDetailsOnTap.Value.ToString();
                 data["autoKeyOverlay"] = AutoKeyOverlay.Value.ToString();
                 data["autoHumanize"] = AutoHumanize.Value.ToString();
                 data["hideTooltips"] = HideTooltips.Value.ToString();
