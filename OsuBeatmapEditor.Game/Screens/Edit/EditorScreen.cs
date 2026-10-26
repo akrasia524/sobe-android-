@@ -195,6 +195,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         }
         // Grid snapping (T): when on, placement snaps to the nearest visual-grid intersection.
         private bool gridSnapEnabled;
+        private UI.GridSnapOverlay gridSnapOverlay = null!;
 
         /// <summary>Toggles grid snapping (the T shortcut and the phone Grid snap button). Turning it on shows the grid if it was hidden.</summary>
         private void toggleGridSnap()
@@ -723,7 +724,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                 IconSize = 28,
                                 AccentBorder = true,
                             },
-                            new UI.GridSnapButton(toggleGridSnap, () => gridSnapEnabled)
+                            new UI.GridSnapButton(toggleGridSnap, () => gridSnapEnabled, () => gridSnapOverlay.ToggleVisibility())
                             {
                                 Anchor = Anchor.TopLeft,
                                 Origin = Anchor.TopLeft,
@@ -1146,6 +1147,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     Confirmed = confirmStreamPreview,
                     Cancelled = cancelStreamPreview,
                 },
+                gridSnapOverlay = new UI.GridSnapOverlay(playfield.Grid),
                 polygonOverlay = new UI.PolygonOverlay { Preview = previewPolygon, Confirmed = createPolygon, Cancelled = cancelPolygon },
                 selectionScaleOverlay = new UI.SelectionScaleOverlay { Preview = previewSelectionScale, Confirmed = applySelectionScale, Cancelled = cancelSelectionScale },
                 selectionRotateOverlay = new UI.SelectionRotateOverlay { Preview = previewSelectionRotate, Confirmed = applySelectionRotate, Cancelled = cancelSelectionRotate },

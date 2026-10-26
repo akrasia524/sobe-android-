@@ -22,16 +22,18 @@ namespace OsuBeatmapEditor.Game.UI
         private const float line = 4.5f;
 
         private readonly Func<bool> isOn;
+        private readonly Action? onSettings;
         private Container content = null!;
         private Box tint = null!;
         private Container icon = null!;
         private bool lastOn;
         private double lastPoll = double.MinValue;
 
-        public GridSnapButton(Action onClick, Func<bool> isOn)
+        public GridSnapButton(Action onClick, Func<bool> isOn, Action? onSettings = null)
         {
             Action = onClick;
             this.isOn = isOn;
+            this.onSettings = onSettings;
         }
 
         public LocalisableString TooltipText => "Grid snap - snap placing and moving objects to the grid";
@@ -78,6 +80,16 @@ namespace OsuBeatmapEditor.Game.UI
                     new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Control },
                     tint = new Box { RelativeSizeAxes = Axes.Both, Colour = EditorTheme.Colours.Accent, Alpha = 0 },
                     icon,
+                    // Small gear in the top-right corner: tapping it opens the grid settings instead of toggling.
+                    new osu.Framework.Graphics.Sprites.SpriteIcon
+                    {
+                        Anchor = Anchor.TopRight,
+                        Origin = Anchor.TopRight,
+                        Icon = osu.Framework.Graphics.Sprites.FontAwesome.Solid.Cog,
+                        Size = new Vector2(14),
+                        Margin = new MarginPadding(3),
+                        Colour = new Color4(0xF2, 0xF2, 0xF2, 0xFF),
+                    },
                 },
             };
 
@@ -125,6 +137,14 @@ namespace OsuBeatmapEditor.Game.UI
 
         protected override bool OnClick(ClickEvent e)
         {
+            // The top-right corner (the gear) opens the grid settings; the rest of the tile toggles grid snap.
+            Vector2 local = ToLocalSpace(e.ScreenSpaceMousePosition);
+            if (onSettings != null && local.X >= DrawWidth - 30 && local.Y <= 30)
+            {
+                onSettings();
+                return true;
+            }
+
             bool handled = base.OnClick(e);
             lastPoll = double.MinValue; // show the new state straight away
             return handled;
