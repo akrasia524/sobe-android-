@@ -89,5 +89,49 @@ namespace OsuBeatmapEditor.Game.DataTests
             Assert.That(grid.Rotation.Value, Is.EqualTo(0f));
             Assert.That(grid.Origin, Is.EqualTo(centre));
         }
+
+        [Test]
+        public void SnappedPointIsAlwaysARealIntersectionInsideThePlayfield()
+        {
+            // A rotated grid near the bottom-right edge: the nearest intersection may be outside, but the result must still be a true,
+            // in-bounds intersection (not a clamped stand-in that sticks while the cursor moves).
+            const float spacing = 32;
+            const float rotation = 25;
+            double a = rotation * System.Math.PI / 180.0;
+
+            for (float x = 500; x >= 300; x -= 4)
+            {
+                var snapped = GridSettings.Snap(new Vector2(x, 372), spacing, rotation, centre);
+                Assert.That(snapped.X, Is.InRange(0f, 512f));
+                Assert.That(snapped.Y, Is.InRange(0f, 384f));
+
+                double dx = snapped.X - centre.X, dy = snapped.Y - centre.Y;
+                double gx = (dx * System.Math.Cos(a) + dy * System.Math.Sin(a)) / spacing;
+                double gy = (-dx * System.Math.Sin(a) + dy * System.Math.Cos(a)) / spacing;
+                Assert.That(gx, Is.EqualTo(System.Math.Round(gx)).Within(0.001));
+                Assert.That(gy, Is.EqualTo(System.Math.Round(gy)).Within(0.001));
+            }
+        }
+
+        [Test]
+        public void DraggingAlongTheEdgeNeverStallsForLong()
+        {
+            // Moving the cursor left along the bottom edge region must change the snapped result at least every ~spacing pixels.
+            const float spacing = 20;
+            Vector2? last = null;
+            float lastChangeX = 500;
+
+            for (float x = 500; x >= 260; x -= 1)
+            {
+                var snapped = GridSettings.Snap(new Vector2(x, 380), spacing, 0, centre);
+                if (last == null || snapped != last)
+                {
+                    last = snapped;
+                    lastChangeX = x;
+                }
+
+                Assert.That(lastChangeX - x, Is.LessThanOrEqualTo(spacing), $"stuck at x={x}");
+            }
+        }
     }
 }

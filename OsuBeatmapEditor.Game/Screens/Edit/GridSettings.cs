@@ -52,15 +52,45 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             double gx = dx * cos + dy * sin;
             double gy = -dx * sin + dy * cos;
 
-            gx = Math.Round(gx / spacing) * spacing;
-            gy = Math.Round(gy / spacing) * spacing;
+            // The nearest grid intersection that lies INSIDE the playfield. (Clamping the nearest intersection instead leaves a
+            // stretch near the edges where the result sits still while the cursor keeps moving - an invisible wall.)
+            int ix0 = (int)Math.Floor(gx / spacing), iy0 = (int)Math.Floor(gy / spacing);
+            bool found = false;
+            double bestDistance = double.MaxValue, bestX = 0, bestY = 0;
 
-            double x = origin.X + gx * cos - gy * sin;
-            double y = origin.Y + gx * sin + gy * cos;
+            for (int ix = ix0 - 1; ix <= ix0 + 2; ix++)
+            {
+                for (int iy = iy0 - 1; iy <= iy0 + 2; iy++)
+                {
+                    double cx = ix * (double)spacing, cy = iy * (double)spacing;
+                    double x = origin.X + cx * cos - cy * sin;
+                    double y = origin.Y + cx * sin + cy * cos;
+
+                    if (x < -0.001 || x > PlayfieldWidth + 0.001 || y < -0.001 || y > PlayfieldHeight + 0.001)
+                        continue;
+
+                    double d = (x - position.X) * (x - position.X) + (y - position.Y) * (y - position.Y);
+                    if (d < bestDistance)
+                    {
+                        found = true;
+                        bestDistance = d;
+                        bestX = x;
+                        bestY = y;
+                    }
+                }
+            }
+
+            if (!found)
+            {
+                // No intersection near here is inside the playfield (a huge spacing off in a corner): fall back to the clamped nearest one.
+                double cx = Math.Round(gx / spacing) * spacing, cy = Math.Round(gy / spacing) * spacing;
+                bestX = origin.X + cx * cos - cy * sin;
+                bestY = origin.Y + cx * sin + cy * cos;
+            }
 
             return new Vector2(
-                Math.Clamp((float)x, 0f, PlayfieldWidth),
-                Math.Clamp((float)y, 0f, PlayfieldHeight));
+                Math.Clamp((float)bestX, 0f, PlayfieldWidth),
+                Math.Clamp((float)bestY, 0f, PlayfieldHeight));
         }
 
         /// <summary>The next spacing in the G cycle: the next preset above the current spacing, then "hidden", then the first preset again.</summary>
