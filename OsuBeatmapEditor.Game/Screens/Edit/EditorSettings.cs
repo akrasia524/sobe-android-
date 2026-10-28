@@ -135,6 +135,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public readonly BindableBool CacheButtons = new BindableBool(false);
 
         /// <summary>
+        /// Phone only: "Lower render resolution" (see <see cref="UI.RenderResolution"/>): 0 = off, 1 = 1280 px wide like osu!droid,
+        /// 2 = 75%, 3 = 60%. Draws into a smaller off-screen picture that is stretched to the screen; touch and layout are unchanged.
+        /// </summary>
+        public readonly BindableInt RenderResolutionMode = new BindableInt(0) { MinValue = 0, MaxValue = UI.RenderResolution.ModeCount - 1 };
+
+        /// <summary>
         /// Diagnostic (not saved): which part of the editor interface is temporarily hidden so the FPS counter shows what that part costs.
         /// 0 = none, 1 = top timeline, 2 = bottom bar, 3 = phone buttons, 4 = side panels + chips, 5-7 = only the timeline's beat ticks / objects / timing lines.
         /// </summary>
@@ -313,6 +319,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             PowerSaving.ValueChanged += _ => save();
             MultiThreaded.ValueChanged += _ => save();
             CacheButtons.ValueChanged += _ => save();
+            RenderResolutionMode.ValueChanged += _ => save();
             PerfDetailsOnTap.ValueChanged += _ => save();
             LiteInterface.ValueChanged += _ => save();
             AutoKeyOverlay.ValueChanged += _ => save();
@@ -393,6 +400,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 if (data.TryGetValue("multiThreaded", out string? mt) && bool.TryParse(mt, out bool mtValue))
                     MultiThreaded.Value = mtValue;
+
+                if (data.TryGetValue("renderResolutionMode", out string? rr) && int.TryParse(rr, out int rrValue))
+                    RenderResolutionMode.Value = Math.Clamp(rrValue, 0, UI.RenderResolution.ModeCount - 1);
 
                 if (data.TryGetValue("cacheButtons", out string? cb) && bool.TryParse(cb, out bool cbValue))
                     CacheButtons.Value = cbValue;
@@ -482,6 +492,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["powerSaving"] = PowerSaving.Value.ToString();
                 data["multiThreaded"] = MultiThreaded.Value.ToString();
                 data["cacheButtons"] = CacheButtons.Value.ToString();
+                data["renderResolutionMode"] = RenderResolutionMode.Value.ToString();
                 data["liteInterface"] = LiteInterface.Value.ToString();
                 data["perfDetailsOnTap"] = PerfDetailsOnTap.Value.ToString();
                 data["autoKeyOverlay"] = AutoKeyOverlay.Value.ToString();

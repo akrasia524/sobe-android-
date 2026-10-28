@@ -19,6 +19,7 @@ namespace OsuBeatmapEditor.Game
         private const string first_run_marker = "first-run.marker";
 
         private ScreenStack screenStack = null!;
+        private UI.RenderScaleHost renderHost = null!;
 
         // Shared, app-wide transient-notification layer. Cached so any screen can push toasts.
         [Cached]
@@ -106,6 +107,8 @@ namespace OsuBeatmapEditor.Game
                 new PresenceReporter(),
                 // Polls for pending collab invites and toasts them while logged in; no visual footprint.
                 new InviteWatcher(),
+                // Everything visible lives in one host so the "Lower render resolution" setting can draw it all at fewer pixels.
+                renderHost = new UI.RenderScaleHost(
                 // Behind the screens: catches scroll over empty space to drive global volume.
                 new ScrollCatcher { Scrolled = volume.AdjustMaster },
                 // Wraps the screens so any IHasTooltip drawable (control-point handles, toolbar chips, ...) can
@@ -114,7 +117,8 @@ namespace OsuBeatmapEditor.Game
                 // In front of everything so the popup is always visible.
                 volume,
                 // Above even the volume popup so action confirmations are never hidden.
-                toasts,
+                toasts
+                ),
             };
         }
 
@@ -162,12 +166,22 @@ namespace OsuBeatmapEditor.Game
                 mode.Value = e.NewValue ? osu.Framework.Platform.ExecutionMode.MultiThreaded : osu.Framework.Platform.ExecutionMode.SingleThread, true);
         }
 
+        /// <summary>Phone only: follows the "Lower render resolution" setting (applies live; "Off" is a plain pass-through).</summary>
+        private void applyRenderResolution()
+        {
+            if (!osu.Framework.RuntimeInfo.IsMobile || tooltipSettings == null)
+                return;
+
+            tooltipSettings.RenderResolutionMode.BindValueChanged(e => renderHost.Mode = e.NewValue, true);
+        }
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
             applyFirstRunDefaults();
             applyThreadingMode();
+            applyRenderResolution();
             screenStack.Push(new SongSelectScreen());
         }
     }

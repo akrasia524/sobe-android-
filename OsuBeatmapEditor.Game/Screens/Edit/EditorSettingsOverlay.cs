@@ -126,6 +126,14 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 items.Add(description("Draws the action buttons as just their icon or text - no filled shapes, outlines or press "
                                      + "animation - so the editor has far less to draw. Takes effect after you re-open the map."));
                 items.Add(divider());
+                var resolutionButton = new OsuButton("Lower render resolution: Off", OsuColour.Surface) { Size = new Vector2(360, 36) };
+                resolutionButton.Action = () => settings.RenderResolutionMode.Value = UI.RenderResolution.Next(settings.RenderResolutionMode.Value);
+                settings.RenderResolutionMode.BindValueChanged(e => resolutionButton.Text = $"Lower render resolution: {UI.RenderResolution.Label(e.NewValue)}", true);
+                items.Add(resolutionButton);
+                items.Add(description("Draws the editor into a smaller picture and stretches it over the screen, like osu!droid does "
+                                     + "(it always draws 1280 pixels wide). The picture gets a little softer; touches and layout do not change. "
+                                     + "Applies at once. Tap again to cycle: Off, 1280 px wide, 75%, 60%. If it ever looks wrong, set it to Off."));
+                items.Add(divider());
                 items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
                 items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "
                                      + "one every frame. Takes effect the next time you open a map. If a button ever looks "
