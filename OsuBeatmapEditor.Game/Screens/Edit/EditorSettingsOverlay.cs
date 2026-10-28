@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -132,7 +132,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 items.Add(resolutionButton);
                 items.Add(description("Draws the editor into a smaller picture and stretches it over the screen, like osu!droid does "
                                      + "(it always draws 1280 pixels wide). The picture gets a little softer; touches and layout do not change. "
-                                     + "Applies at once. Tap again to cycle: Off, 1280 px wide, 75%, 60%. If it ever looks wrong, set it to Off."));
+                                     + "Applies at once. Tap again to cycle: Off, 1280 px wide, 75%, 60%, 50%, 40%, 30%. If it ever looks wrong, set it to Off."));
                 items.Add(divider());
                 items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
                 items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "

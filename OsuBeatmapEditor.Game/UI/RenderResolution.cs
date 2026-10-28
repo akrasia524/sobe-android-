@@ -16,22 +16,28 @@ namespace OsuBeatmapEditor.Game.UI
         public const int DroidLike = 1;
         public const int ThreeQuarters = 2;
         public const int Sixty = 3;
-        public const int ModeCount = 4;
+        public const int Half = 4;
+        public const int Forty = 5;
+        public const int Thirty = 6;
+        public const int ModeCount = 7;
 
-        private const float min_factor = 0.4f;
+        private const float min_factor = 0.25f;
 
         public static string Label(int mode) => mode switch
         {
             DroidLike => "1280 px wide (like osu!droid)",
             ThreeQuarters => "75%",
             Sixty => "60%",
+            Half => "50%",
+            Forty => "40%",
+            Thirty => "30% (very soft)",
             _ => "Off (full resolution)",
         };
 
         public static int Next(int mode) => (Math.Clamp(mode, 0, ModeCount - 1) + 1) % ModeCount;
 
         /// <summary>
-        /// The fraction of the screen's pixels to render at: 1 means "no lowering at all". Never below 0.4 and never above 1
+        /// The fraction of the screen's pixels to render at: 1 means "no lowering at all". Never below 0.25 and never above 1
         /// (a screen already narrower than 1280 pixels is left alone), and any unknown input falls back to 1.
         /// </summary>
         public static float Factor(int mode, float screenPixelWidth)
@@ -41,6 +47,9 @@ namespace OsuBeatmapEditor.Game.UI
                 DroidLike => screenPixelWidth > 0 ? DroidWidth / screenPixelWidth : 1f,
                 ThreeQuarters => 0.75f,
                 Sixty => 0.6f,
+                Half => 0.5f,
+                Forty => 0.4f,
+                Thirty => 0.3f,
                 _ => 1f,
             };
 

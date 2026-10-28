@@ -31,7 +31,15 @@ namespace OsuBeatmapEditor.Game.DataTests
         [Test]
         public void DroidLikeNeverGoesBelowTheFloor()
         {
-            Assert.That(RenderResolution.Factor(RenderResolution.DroidLike, 100000), Is.EqualTo(0.4f).Within(0.0001));
+            Assert.That(RenderResolution.Factor(RenderResolution.DroidLike, 100000), Is.EqualTo(0.25f).Within(0.0001));
+        }
+
+        [Test]
+        public void LowestStepsAreExactAndAboveTheFloor()
+        {
+            Assert.That(RenderResolution.Factor(RenderResolution.Half, 1612), Is.EqualTo(0.5f));
+            Assert.That(RenderResolution.Factor(RenderResolution.Forty, 1612), Is.EqualTo(0.4f));
+            Assert.That(RenderResolution.Factor(RenderResolution.Thirty, 1612), Is.EqualTo(0.3f));
         }
 
         [Test]
@@ -61,7 +69,7 @@ namespace OsuBeatmapEditor.Game.DataTests
                 mode = RenderResolution.Next(mode);
             }
 
-            Assert.That(seen, Is.EqualTo(new[] { 0, 1, 2, 3 }));
+            Assert.That(seen, Is.EqualTo(new[] { 0, 1, 2, 3, 4, 5, 6 }));
             Assert.That(mode, Is.EqualTo(RenderResolution.Off));
             Assert.That(RenderResolution.Next(99), Is.EqualTo(RenderResolution.Off));
         }
