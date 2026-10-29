@@ -3869,6 +3869,10 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 delta = magneticMoveSnap(delta);
             }
 
+            // Snapping can land on a fractional spot (a slider tail is rarely a whole pixel), but the drop is saved in whole
+            // pixels. Show the whole-pixel result while dragging so the objects don't jump when the finger lifts.
+            delta = Beatmaps.WholePixels.Round(delta);
+
             // Clamp so the whole selection stays inside the playfield.
             float dx = Math.Clamp(delta.X, -moveMin.X, ParsedBeatmap.PLAYFIELD_WIDTH - moveMax.X);
             float dy = Math.Clamp(delta.Y, -moveMin.Y, ParsedBeatmap.PLAYFIELD_HEIGHT - moveMax.Y);
@@ -3885,7 +3889,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// from the previous object by the time gap, then magnetic snapping locks onto a very close object.
         /// Used both by the placement preview and by the actual placement so they always agree.
         /// </summary>
-        public Vector2 SnapPlacement(Vector2 cursor)
+        public Vector2 SnapPlacement(Vector2 cursor) => Beatmaps.WholePixels.Round(snapPlacementUnrounded(cursor));
+
+        private Vector2 snapPlacementUnrounded(Vector2 cursor)
         {
             // Holding Shift while placing engages the spacing guide: it snaps to a matching nearby gap (and draws
             // the distance lines). It takes over from the time-distance / magnetic snapping while held.
