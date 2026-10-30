@@ -4,6 +4,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
@@ -78,7 +79,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         private const double tick_fade_ms = 90;     // how quickly a tick fades out as the ball reaches it
         private const double tick_fade_in_ms = 150; // how quickly a tick fades in (lazer's DrawableSliderTick ANIM_DURATION)
         private Drawable? spinnerRotor;
-        private Box? clickFlash;
+        private Drawable? clickFlash;
 
         private readonly IReadOnlyList<Vector2>? path;
         private float[] cumulativeLength = Array.Empty<float>();
@@ -94,6 +95,36 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         // the procedural fallbacks below are skipped per-element. Resolved before the BDL builds the visuals.
         [Resolved(CanBeNull = true)]
         private SkinManager? skinManager { get; set; }
+
+        [Resolved]
+        private IRenderer renderer { get; set; } = null!;
+
+        /// <summary>
+        /// "Simple renderer": the procedural (non-skin) pieces are drawn as plain sprites of shared pre-drawn disc/ring textures
+        /// instead of masked rounded containers, so the GPU can batch them. Same look; far fewer draw calls.
+        /// </summary>
+        private bool simple => settings.SimpleRenderer.Value;
+
+        /// <summary>A sprite of the shared disc texture (a filled circle filling its box).</summary>
+        private Sprite discSprite(Color4 colour, float alpha = 1f) => new Sprite
+        {
+            RelativeSizeAxes = Axes.Both,
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            Texture = SimpleShapeTextures.Disc(renderer),
+            Colour = colour,
+            Alpha = alpha,
+        };
+
+        /// <summary>A sprite of a shared ring texture, <paramref name="thicknessFraction"/> of its box wide.</summary>
+        private Sprite ringSprite(Color4 colour, float thicknessFraction) => new Sprite
+        {
+            RelativeSizeAxes = Axes.Both,
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            Texture = SimpleShapeTextures.Ring(renderer, thicknessFraction),
+            Colour = colour,
+        };
 
         private Skin? skin => skinManager?.Current.Value;
 
@@ -403,6 +434,24 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 };
             }
 
+            if (simple)
+            {
+                float tickSize = diameter * settings.SliderTickSize.Value;
+                float tickBorder = Math.Max(1f, diameter * 0.02f);
+                return new Container
+                {
+                    Position = position,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(tickSize),
+                    Alpha = tick_base_alpha,
+                    Children = new Drawable[]
+                    {
+                        discSprite(Color4.White),
+                        ringSprite(new Color4(combo.R * 0.6f, combo.G * 0.6f, combo.B * 0.6f, 1f), tickBorder / Math.Max(1f, tickSize)),
+                    },
+                };
+            }
+
             return new CircularContainer
             {
                 Position = position,
@@ -454,6 +503,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 return container;
             }
 
+            if (simple)
+            {
+                return new Container
+                {
+                    Position = position,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(diameter),
+                    Children = new Drawable[]
+                    {
+                        discSprite(fill, objectOpacity),
+                        ringSprite(Color4.White, borderFactor),
+                    },
+                };
+            }
+
             return new CircularContainer
             {
                 Position = position,
@@ -472,7 +536,28 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         }
 
         /// <summary>A white disc filling the head circle, normally invisible; pulsed at the object's start time as a hit flash.</summary>
-        private Drawable flashLayer(Vector2 position) => new CircularContainer
+        private Drawable flashLayer(Vector2 position)
+        {
+            if (simple)
+            {
+                var flash = new Sprite
+                {
+                    Position = position,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(diameter),
+                    Texture = SimpleShapeTextures.Disc(renderer),
+                    Colour = Color4.White,
+                    Alpha = 0,
+                    AlwaysPresent = true,
+                };
+                clickFlash = flash;
+                return flash;
+            }
+
+            return maskedFlashLayer(position);
+        }
+
+        private Drawable maskedFlashLayer(Vector2 position) => new CircularContainer
         {
             Position = position,
             Origin = Anchor.Centre,
@@ -607,6 +692,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 };
             }
 
+            if (simple)
+            {
+                return new Container
+                {
+                    Position = position,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(diameter),
+                    Alpha = 0,
+                    Child = ringSprite(colour, 0.06f),
+                };
+            }
+
             return new CircularContainer
             {
                 Position = position,
@@ -630,7 +727,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// An outlined ring that sits exactly on the circle, then expands outward and fades as the object is
         /// hit - osu!lazer's circle "explosion" feel (scale ~1 → 1.5, fade out over ~260 ms).
         /// </summary>
-        private Container hitExplosion(Vector2 position, Color4 colour) => new CircularContainer
+        private Container hitExplosion(Vector2 position, Color4 colour) => simple
+            ? new Container
+            {
+                Position = position,
+                Origin = Anchor.Centre,
+                Size = new Vector2(diameter),
+                Alpha = 0,
+                Child = ringSprite(colour, 0.045f),
+            }
+            : maskedHitExplosion(position, colour);
+
+        private Container maskedHitExplosion(Vector2 position, Color4 colour) => new CircularContainer
         {
             Position = position,
             Origin = Anchor.Centre,
@@ -729,6 +837,17 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 };
             }
 
+            if (simple)
+            {
+                return new Container
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.Both,
+                    Child = ringSprite(new Color4(colour.R, colour.G, colour.B, 0.8f), borderFactor / follow_scale),
+                };
+            }
+
             return new CircularContainer
             {
                 Anchor = Anchor.Centre,
@@ -759,6 +878,21 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                     FillMode = FillMode.Fit,
                     Texture = tex,
                     Colour = ballColour,
+                };
+            }
+
+            if (simple)
+            {
+                return new Container
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(diameter),
+                    Children = new Drawable[]
+                    {
+                        discSprite(colour, 0.95f),
+                        ringSprite(Color4.White, borderFactor),
+                    },
                 };
             }
 

@@ -134,6 +134,11 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                      + "(it always draws 1280 pixels wide). The picture gets a little softer; touches and layout do not change. "
                                      + "Applies at once. Tap again to cycle: Off, 1280 px wide, 75%, 60%, 50%, 40%, 30%. If it ever looks wrong, set it to Off."));
                 items.Add(divider());
+                items.Add(toggleRow("Simple renderer (faster)", settings.SimpleRenderer));
+                items.Add(description("Draws hit circles, approach rings, slider balls and ticks as plain pictures instead of "
+                                     + "masked rounded shapes, which the phone can draw together in far fewer steps. It should "
+                                     + "look the same. Applies at once. If anything looks wrong, switch it off."));
+                items.Add(divider());
                 items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
                 items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "
                                      + "one every frame. Takes effect the next time you open a map. If a button ever looks "

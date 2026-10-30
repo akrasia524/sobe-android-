@@ -326,6 +326,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             settings.ObjectBackgroundOpacity.ValueChanged += _ => rebuildAppearance();
             settings.ObjectBorderThickness.ValueChanged += _ => rebuildAppearance();
             settings.SliderTickSize.ValueChanged += _ => rebuildAppearance();
+            settings.SimpleRenderer.ValueChanged += _ => rebuildAppearance();
             settings.ObjectFadeOut.ValueChanged += _ => rebuildAppearance();
             // Combo palette changes (editor palette, map colours, or the use-map-colours toggle) all funnel
             // through EditableBeatmap.ColoursChanged - rebuild so objects pick up the new colours live.

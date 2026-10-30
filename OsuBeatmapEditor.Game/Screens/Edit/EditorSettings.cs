@@ -135,6 +135,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public readonly BindableBool CacheButtons = new BindableBool(false);
 
         /// <summary>
+        /// Phone: "Simple renderer" - hit circles, approach rings, slider balls and ticks are drawn as plain sprites of shared
+        /// disc/ring textures instead of masked rounded containers, so the GPU can batch them. Same look, fewer draw calls.
+        /// </summary>
+        public readonly BindableBool SimpleRenderer = new BindableBool(false);
+
+        /// <summary>
         /// Phone only: "Lower render resolution" (see <see cref="UI.RenderResolution"/>): 0 = off, 1 = 1280 px wide like osu!droid,
         /// 2 = 75%, 3 = 60%. Draws into a smaller off-screen picture that is stretched to the screen; touch and layout are unchanged.
         /// </summary>
@@ -319,6 +325,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             PowerSaving.ValueChanged += _ => save();
             MultiThreaded.ValueChanged += _ => save();
             CacheButtons.ValueChanged += _ => save();
+            SimpleRenderer.ValueChanged += _ => save();
             RenderResolutionMode.ValueChanged += _ => save();
             PerfDetailsOnTap.ValueChanged += _ => save();
             LiteInterface.ValueChanged += _ => save();
@@ -403,6 +410,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 if (data.TryGetValue("renderResolutionMode", out string? rr) && int.TryParse(rr, out int rrValue))
                     RenderResolutionMode.Value = Math.Clamp(rrValue, 0, UI.RenderResolution.ModeCount - 1);
+
+                if (data.TryGetValue("simpleRenderer", out string? sr) && bool.TryParse(sr, out bool srValue))
+                    SimpleRenderer.Value = srValue;
 
                 if (data.TryGetValue("cacheButtons", out string? cb) && bool.TryParse(cb, out bool cbValue))
                     CacheButtons.Value = cbValue;
@@ -492,6 +502,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["powerSaving"] = PowerSaving.Value.ToString();
                 data["multiThreaded"] = MultiThreaded.Value.ToString();
                 data["cacheButtons"] = CacheButtons.Value.ToString();
+                data["simpleRenderer"] = SimpleRenderer.Value.ToString();
                 data["renderResolutionMode"] = RenderResolutionMode.Value.ToString();
                 data["liteInterface"] = LiteInterface.Value.ToString();
                 data["perfDetailsOnTap"] = PerfDetailsOnTap.Value.ToString();
