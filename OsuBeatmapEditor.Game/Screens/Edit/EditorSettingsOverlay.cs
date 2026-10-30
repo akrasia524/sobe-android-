@@ -158,7 +158,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             items.Add(description("Diagnostic: temporarily hides one part of the editor so you can read the FPS counter and see what "
                                  + "that part costs. It resets when you leave the editor."));
             var hideButton = new OsuButton("Hide: nothing", OsuColour.Surface) { Size = new Vector2(260, 36) };
-            string[] names = { "nothing", "top timeline", "bottom bar", "phone buttons", "side panels + chips", "timeline ticks only", "timeline objects only", "timeline lines only" };
+            string[] names = { "nothing", "top timeline", "bottom bar", "phone buttons", "side panels + chips", "timeline ticks only", "timeline objects only", "timeline lines only", "playfield objects", "slider bodies only" };
             hideButton.Action = () => settings.PerfHidePart.Value = (settings.PerfHidePart.Value + 1) % names.Length;
             settings.PerfHidePart.BindValueChanged(e => hideButton.Text = "Hide: " + names[e.NewValue], true);
             items.Add(hideButton);

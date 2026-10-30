@@ -311,7 +311,8 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             foreach (var (d, alpha) in perfHidden)
                 d.Alpha = alpha;
             perfHidden.Clear();
-            topTimeline.PerfHideLayer(part >= 5 ? part - 4 : 0);
+            topTimeline.PerfHideLayer(part is >= 5 and <= 7 ? part - 4 : 0);
+            playfield.PerfHide(part == 8 ? 1 : part == 9 ? 2 : 0);
 
             Drawable?[] targets = part switch
             {

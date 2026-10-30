@@ -1033,9 +1033,15 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             }
         }
 
+        /// <summary>Diagnostic only (Settings > Performance > Hide): hides every slider body so its cost can be measured.</summary>
+        public static bool PerfHideBodies;
+
         protected override void Update()
         {
             base.Update();
+
+            if (sliderBody != null)
+                sliderBody.Alpha = PerfHideBodies ? 0f : 1f;
 
             // The slider ball follows the path each frame while active - lazer updates its ball per-frame too.
             // Runs only while this object is within its lifetime (the container culls the rest).

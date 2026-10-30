@@ -339,6 +339,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// </summary>
         public void RebuildObjects() => rebuildAppearance();
 
+        /// <summary>Diagnostic only: 0 = show everything, 1 = hide all hit objects, 2 = hide only the slider bodies.</summary>
+        public void PerfHide(int mode)
+        {
+            hitObjectContainer.Alpha = mode == 1 ? 0f : 1f;
+            DrawableHitObject.PerfHideBodies = mode == 2;
+        }
+
         /// <summary>When set, objects are tinted by who placed them (authorship mode) instead of by combo colour.</summary>
         public Func<HitObjectModel, Color4?>? AuthorColourProvider;
 
