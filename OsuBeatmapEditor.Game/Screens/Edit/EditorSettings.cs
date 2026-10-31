@@ -141,6 +141,13 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         public readonly BindableBool SimpleRenderer = new BindableBool(false);
 
         /// <summary>
+        /// Phone: "Faster slider bodies" - slider tubes drawn as plain coloured quads straight to the screen instead of through the
+        /// framework's path (which renders each slider into its own off-screen picture). Same colours; a slider crossing itself
+        /// blends twice where the layers overlap.
+        /// </summary>
+        public readonly BindableBool FastSliderBodies = new BindableBool(false);
+
+        /// <summary>
         /// Phone only: "Lower render resolution" (see <see cref="UI.RenderResolution"/>): 0 = off, 1 = 1280 px wide like osu!droid,
         /// 2 = 75%, 3 = 60%. Draws into a smaller off-screen picture that is stretched to the screen; touch and layout are unchanged.
         /// </summary>
@@ -326,6 +333,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             MultiThreaded.ValueChanged += _ => save();
             CacheButtons.ValueChanged += _ => save();
             SimpleRenderer.ValueChanged += _ => save();
+            FastSliderBodies.ValueChanged += _ => save();
             RenderResolutionMode.ValueChanged += _ => save();
             PerfDetailsOnTap.ValueChanged += _ => save();
             LiteInterface.ValueChanged += _ => save();
@@ -410,6 +418,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
                 if (data.TryGetValue("renderResolutionMode", out string? rr) && int.TryParse(rr, out int rrValue))
                     RenderResolutionMode.Value = Math.Clamp(rrValue, 0, UI.RenderResolution.ModeCount - 1);
+
+                if (data.TryGetValue("fastSliderBodies", out string? fsb) && bool.TryParse(fsb, out bool fsbValue))
+                    FastSliderBodies.Value = fsbValue;
 
                 if (data.TryGetValue("simpleRenderer", out string? sr) && bool.TryParse(sr, out bool srValue))
                     SimpleRenderer.Value = srValue;
@@ -503,6 +514,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 data["multiThreaded"] = MultiThreaded.Value.ToString();
                 data["cacheButtons"] = CacheButtons.Value.ToString();
                 data["simpleRenderer"] = SimpleRenderer.Value.ToString();
+                data["fastSliderBodies"] = FastSliderBodies.Value.ToString();
                 data["renderResolutionMode"] = RenderResolutionMode.Value.ToString();
                 data["liteInterface"] = LiteInterface.Value.ToString();
                 data["perfDetailsOnTap"] = PerfDetailsOnTap.Value.ToString();

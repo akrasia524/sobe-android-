@@ -139,6 +139,12 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                                      + "masked rounded shapes, which the phone can draw together in far fewer steps. It should "
                                      + "look the same. Applies at once. If anything looks wrong, switch it off."));
                 items.Add(divider());
+                items.Add(toggleRow("Faster slider bodies", settings.FastSliderBodies));
+                items.Add(description("Draws slider bodies as plain coloured strips straight to the screen instead of the framework's "
+                                     + "slider path, which draws every slider into its own hidden picture first. Same colours. "
+                                     + "Where a slider crosses over itself the overlap looks a little stronger. Applies at once. "
+                                     + "If anything looks wrong, switch it off."));
+                items.Add(divider());
                 items.Add(toggleRow("Cache action buttons (faster)", settings.CacheButtons));
                 items.Add(description("Draws the right-hand action buttons as one cached picture instead of redrawing each "
                                      + "one every frame. Takes effect the next time you open a map. If a button ever looks "

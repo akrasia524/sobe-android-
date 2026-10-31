@@ -65,6 +65,9 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
             CentreOpacity = skinned ? 1f : 0.8f;
         }
 
+        /// <summary>The colour (with alpha) at a position across the tube: 0 = outer edge, 1 = centre. Used by the faster slider body.</summary>
+        public Color4 Sample(float position) => ColourAt(position);
+
         protected override Color4 ColourAt(float position)
         {
             if (position <= BorderPortion)

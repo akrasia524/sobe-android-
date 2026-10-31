@@ -56,7 +56,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
 
         // The slider tube. It is the ONLY per-object drawable that owns a GPU vertex buffer (it's a path); it is
         // realized/released with the object's lifetime so off-screen sliders don't keep their geometry resident.
-        private SliderBodyPath? sliderBody;
+        private Drawable? sliderBody;
         private Color4 comboColour;
 
         // Reverse arrows at the slider ends; shown only while the ball is heading toward an end where a reverse
@@ -274,7 +274,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 buildArcLengths();
                 comboColour = combo;
 
-                sliderBody = buildSliderBody();
+                sliderBody = createSliderBody();
                 AddInternal(sliderBody);
 
                 // Slider ticks: small dots along the path at the tick-rate spacing (under the head/ball,
@@ -334,6 +334,18 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
         /// <see cref="SliderBodyPath.BorderPortion"/> of the radius, then a gradient body filling inside it).
         /// This is the only drawable here that owns a GPU vertex buffer, so it is created/destroyed on demand.
         /// </summary>
+        /// <summary>The slider body drawable: the faster plain-quad one when that setting is on, else the framework path.</summary>
+        private Drawable createSliderBody()
+        {
+            var style = buildSliderBody();
+
+            if (!settings.FastSliderBodies.Value)
+                return style;
+
+            // The path object only carries the colours here; it is never added to the scene.
+            return new FastSliderBody(path!, diameter / 2f, style) { Depth = 1f };
+        }
+
         private SliderBodyPath buildSliderBody()
         {
             var body = new SliderBodyPath
@@ -370,7 +382,7 @@ namespace OsuBeatmapEditor.Game.Screens.Edit
                 if (sliderBody != null)
                     return;
 
-                sliderBody = buildSliderBody();
+                sliderBody = createSliderBody();
                 AddInternal(sliderBody);
             }
             else
