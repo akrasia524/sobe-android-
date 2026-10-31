@@ -1,0 +1,21 @@
+  Determining projects to restore...
+  Restored /home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Resources/OsuBeatmapEditor.Resources.csproj (in 96 ms).
+  Restored /home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Game/OsuBeatmapEditor.Game.csproj (in 7.23 sec).
+  Restored /home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj (in 7.71 sec).
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Android component "tools" is obsolete, please install "cmdline-tools" [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Trying to fallback to "tools"... [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Dependency `platforms;android-34` should have been installed but could not be resolved. You can attempt to install it with: `/usr/local/lib/android/sdk/cmdline-tools/11.0/bin/sdkmanager --install "platforms;android-34"` [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Dependency `build-tools;34.0.0` should have been installed but could not be resolved. You can attempt to install it with: `/usr/local/lib/android/sdk/cmdline-tools/11.0/bin/sdkmanager --install "build-tools;34.0.0"` [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Dependency `platform-tools` should have been installed but could not be resolved. You can attempt to install it with: `/usr/local/lib/android/sdk/cmdline-tools/11.0/bin/sdkmanager --install "platform-tools"` [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+
+Build succeeded.
+
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Android component "tools" is obsolete, please install "cmdline-tools" [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Trying to fallback to "tools"... [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Dependency `platforms;android-34` should have been installed but could not be resolved. You can attempt to install it with: `/usr/local/lib/android/sdk/cmdline-tools/11.0/bin/sdkmanager --install "platforms;android-34"` [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Dependency `build-tools;34.0.0` should have been installed but could not be resolved. You can attempt to install it with: `/usr/local/lib/android/sdk/cmdline-tools/11.0/bin/sdkmanager --install "build-tools;34.0.0"` [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+/usr/share/dotnet/packs/Microsoft.Android.Sdk.Linux/34.0.154/tools/Xamarin.Installer.Common.targets(12,3): warning : Dependency `platform-tools` should have been installed but could not be resolved. You can attempt to install it with: `/usr/local/lib/android/sdk/cmdline-tools/11.0/bin/sdkmanager --install "platform-tools"` [/home/runner/work/sobe-android-/sobe-android-/OsuBeatmapEditor.Android/OsuBeatmapEditor.Android.csproj]
+    5 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.21
